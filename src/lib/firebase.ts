@@ -28,7 +28,11 @@ try {
     experimentalForceLongPolling: true
   }, databaseId);
 } catch (e) {
-  firestoreDb = getFirestore(app, databaseId);
+  try {
+    firestoreDb = getFirestore(app, databaseId);
+  } catch (e2) {
+    firestoreDb = getFirestore(app);
+  }
 }
 export const db = firestoreDb;
 

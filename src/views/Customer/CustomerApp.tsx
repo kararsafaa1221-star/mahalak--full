@@ -677,18 +677,23 @@ export const CustomerApp: React.FC = () => {
   });
 
   // تصفية الطلبات الخاصة بالزبون الحالي
-  const customerOrders = [...orders].filter(o => o.customerId === currentCustomer?.id).sort((a, b) => {
-    const timeA = (a.createdAt as any)?.toMillis ? (a.createdAt as any).toMillis() : Date.parse((a.createdAt as string) || '');
-    const timeB = (b.createdAt as any)?.toMillis ? (b.createdAt as any).toMillis() : Date.parse((b.createdAt as string) || '');
-    return (Number(timeB) || 0) - (Number(timeA) || 0);
-  });
-  const customerNotifications = notifications
-    .filter(n => n.userId === currentCustomer?.id && n.role === 'customer')
-    .sort((a, b) => {
+  const customerOrders = React.useMemo(() => {
+    return [...orders].filter(o => o.customerId === currentCustomer?.id).sort((a, b) => {
       const timeA = (a.createdAt as any)?.toMillis ? (a.createdAt as any).toMillis() : Date.parse((a.createdAt as string) || '');
       const timeB = (b.createdAt as any)?.toMillis ? (b.createdAt as any).toMillis() : Date.parse((b.createdAt as string) || '');
       return (Number(timeB) || 0) - (Number(timeA) || 0);
     });
+  }, [orders, currentCustomer?.id]);
+
+  const customerNotifications = React.useMemo(() => {
+    return notifications
+      .filter(n => n.userId === currentCustomer?.id && n.role === 'customer')
+      .sort((a, b) => {
+        const timeA = (a.createdAt as any)?.toMillis ? (a.createdAt as any).toMillis() : Date.parse((a.createdAt as string) || '');
+        const timeB = (b.createdAt as any)?.toMillis ? (b.createdAt as any).toMillis() : Date.parse((b.createdAt as string) || '');
+        return (Number(timeB) || 0) - (Number(timeA) || 0);
+      });
+  }, [notifications, currentCustomer?.id]);
   const unreadNotifsCount = notifications.filter(n => n.userId === currentCustomer?.id && n.role === 'customer' && !n.read).length;
   const [lastNotifCount, setLastNotifCount] = useState(unreadNotifsCount);
 

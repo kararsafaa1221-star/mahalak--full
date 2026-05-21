@@ -1,6 +1,6 @@
 import { initializeApp, getApp, getApps } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { initializeFirestore } from 'firebase/firestore';
+import { getFirestore, initializeFirestore } from 'firebase/firestore';
 import firebaseConfigData from '../../firebase-applet-config.json';
 
 // Configuration from applet config or environment variables
@@ -22,8 +22,14 @@ console.log("Configuring Firestore for project:", firebaseConfig.projectId, "usi
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
 // Use initializeFirestore with settings optimized for proxy environments
-export const db = initializeFirestore(app, {
-  experimentalForceLongPolling: true
-}, databaseId);
+let firestoreDb;
+try {
+  firestoreDb = initializeFirestore(app, {
+    experimentalForceLongPolling: true
+  }, databaseId);
+} catch (e) {
+  firestoreDb = getFirestore(app, databaseId);
+}
+export const db = firestoreDb;
 
 export const auth = getAuth(app);

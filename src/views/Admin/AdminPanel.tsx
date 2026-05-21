@@ -7,7 +7,7 @@ import {
   Check, X, Ban, RefreshCw, Search, Edit, AlertTriangle, LogOut, 
   TrendingUp, Calendar, Package, Ticket, Eye, EyeOff, Trash2,
   Plus, Copy, Globe, Star, ShoppingBag, CreditCard, Archive,
-  BarChart3, Activity, Zap, Award, Crown, Palette, Menu, CheckCircle, MessageCircle, Send, Loader2, MapPin, Clock
+  BarChart3, Activity, Zap, Award, Crown, Palette, Menu, CheckCircle, MessageCircle, Send, Loader2, MapPin, Clock, Truck, Camera, Megaphone
 } from 'lucide-react';
 import { ImageUploader } from '../../components/ImageUploader';
 import { sendWhatsAppMessage } from '../../services/otpService';
@@ -65,7 +65,7 @@ const BroadcastForm: React.FC = () => {
           onChange={(e) => setTitle(e.target.value)}
           placeholder="مثال: عروض رمضان الكبرى"
           required
-          className="w-full border border-gray-200 p-3 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+          className="w-full border border-gray-200 p-3 rounded-xl text-sm focus:ring-2 focus:ring-[#9952FF] focus:outline-none"
         />
       </div>
 
@@ -77,7 +77,7 @@ const BroadcastForm: React.FC = () => {
           placeholder="اكتب محتوى الإشعار هنا..."
           required
           rows={4}
-          className="w-full border border-gray-200 p-3 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none resize-none"
+          className="w-full border border-gray-200 p-3 rounded-xl text-sm focus:ring-2 focus:ring-[#9952FF] focus:outline-none resize-none"
         />
       </div>
 
@@ -86,7 +86,7 @@ const BroadcastForm: React.FC = () => {
         <select 
           value={target}
           onChange={(e) => setTarget(e.target.value)}
-          className="w-full border border-gray-200 p-3 rounded-xl text-sm bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+          className="w-full border border-gray-200 p-3 rounded-xl text-sm bg-white focus:ring-2 focus:ring-[#9952FF] focus:outline-none"
         >
           <option value="all">جميع الزبائن ({customers.length})</option>
           {provinces.map(p => {
@@ -96,11 +96,11 @@ const BroadcastForm: React.FC = () => {
         </select>
       </div>
 
-      <div className="bg-indigo-50 p-3 rounded-xl border border-indigo-100">
-        <p className="text-xs text-indigo-700 font-bold">
+      <div className="bg-[#f5eeff] p-3 rounded-xl border border-[#e9daff]">
+        <p className="text-xs text-[#4D2980] font-bold">
           📊 عدد الزبائن اللي راح يستلمون الإشعار: <span className="text-lg">{targetCount}</span> زبون
         </p>
-        <p className="text-[10px] text-indigo-500 mt-1">
+        <p className="text-[10px] text-[#9952FF] mt-1">
           الإشعار يرسل باسم "محلك" ويظهر للزبائن في قائمة إشعاراتهم
         </p>
       </div>
@@ -108,7 +108,7 @@ const BroadcastForm: React.FC = () => {
       <button 
         type="submit"
         disabled={!title.trim() || !message.trim()}
-        className="w-full py-3 bg-gradient-to-l from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white font-bold rounded-xl shadow-lg transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 space-x-reverse"
+        className="w-full py-3 bg-gradient-to-l from-[#9952FF] to-[#4D2980] hover:from-[#4D2980] hover:to-[#4D2980] text-white font-bold rounded-xl shadow-lg transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 space-x-reverse"
       >
         <Bell size={18} />
         <span>إرسال الإشعار الآن</span>
@@ -127,7 +127,7 @@ const DatabasePanel: React.FC = () => {
 
     const collections = [
         { name: 'المتاجر (Stores)', count: stores.length, icon: <StoreIcon size={20} className="text-blue-500" /> },
-        { name: 'المنتجات (Products)', count: products.length, icon: <Package size={20} className="text-indigo-500" /> },
+        { name: 'المنتجات (Products)', count: products.length, icon: <Package size={20} className="text-[#9952FF]" /> },
         { name: 'الزبائن (Customers)', count: customers.length, icon: <Users size={20} className="text-purple-500" /> },
         { name: 'الطلبات (Orders)', count: orders.length, icon: <ShoppingBag size={20} className="text-orange-500" /> },
         { name: 'أكواد الخصم (Promo Codes)', count: promoCodes.length, icon: <Ticket size={20} className="text-green-500" /> },
@@ -159,7 +159,7 @@ const DatabasePanel: React.FC = () => {
                     <Archive size={24} className="text-amber-500" />
                     معاينة البيانات في الوقت الفعلي
                 </h3>
-                <div className="bg-slate-900 rounded-2xl p-6 font-mono text-[11px] text-emerald-400 overflow-x-auto">
+                <div className="bg-[#4D2980] rounded-2xl p-6 font-mono text-[11px] text-emerald-400 overflow-x-auto">
                     <div className="flex flex-col gap-2">
                         <div><span className="text-slate-500">// Firestore Database Structure Preview</span></div>
                         <div><span className="text-blue-400">adminSettings:</span> {JSON.stringify(adminSettings, null, 2)}</div>
@@ -297,7 +297,7 @@ const WhatsappRetargetingPanel: React.FC = () => {
         <div className="lg:col-span-1 space-y-6">
           <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
             <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2 border-b pb-3">
-              <LogOut size={16} className="text-indigo-500"/>
+              <LogOut size={16} className="text-[#9952FF]"/>
               شريحة الاستهداف
             </h3>
             
@@ -308,7 +308,7 @@ const WhatsappRetargetingPanel: React.FC = () => {
                   disabled={sending}
                   value={filterType}
                   onChange={(e) => setFilterType(e.target.value as any)}
-                  className="w-full border border-slate-200 p-3 rounded-xl text-sm font-bold bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none transition"
+                  className="w-full border border-slate-200 p-3 rounded-xl text-sm font-bold bg-slate-50 focus:bg-white focus:ring-2 focus:ring-[#9952FF] outline-none transition"
                 >
                   <option value="inactive_30_days">لم يشتروا منذ 30 يوماً</option>
                   <option value="inactive_60_days">لم يشتروا منذ 60 يوماً</option>
@@ -323,7 +323,7 @@ const WhatsappRetargetingPanel: React.FC = () => {
                     disabled={sending}
                     value={promoDiscountType}
                     onChange={(e) => setPromoDiscountType(e.target.value as any)}
-                    className="w-full border border-slate-200 p-3 rounded-xl text-sm font-bold bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none transition"
+                    className="w-full border border-slate-200 p-3 rounded-xl text-sm font-bold bg-slate-50 focus:bg-white focus:ring-2 focus:ring-[#9952FF] outline-none transition"
                   >
                     <option value="amount">مبلغ ثابت</option>
                     <option value="percent">نسبة (%)</option>
@@ -336,7 +336,7 @@ const WhatsappRetargetingPanel: React.FC = () => {
                     type="number"
                     value={promoAmount}
                     onChange={(e) => setPromoAmount(Number(e.target.value))}
-                    className="w-full border border-slate-200 p-3 rounded-xl text-sm font-bold bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none transition text-center"
+                    className="w-full border border-slate-200 p-3 rounded-xl text-sm font-bold bg-slate-50 focus:bg-white focus:ring-2 focus:ring-[#9952FF] outline-none transition text-center"
                   />
                 </div>
               </div>
@@ -349,7 +349,7 @@ const WhatsappRetargetingPanel: React.FC = () => {
                     type="number"
                     value={promoMaxUsesPerUser}
                     onChange={(e) => setPromoMaxUsesPerUser(Number(e.target.value))}
-                    className="w-full border border-slate-200 p-3 rounded-xl text-sm font-bold bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none transition text-center"
+                    className="w-full border border-slate-200 p-3 rounded-xl text-sm font-bold bg-slate-50 focus:bg-white focus:ring-2 focus:ring-[#9952FF] outline-none transition text-center"
                   />
                 </div>
                 <div>
@@ -359,13 +359,13 @@ const WhatsappRetargetingPanel: React.FC = () => {
                     type="number"
                     value={promoExpiryDays}
                     onChange={(e) => setPromoExpiryDays(Number(e.target.value))}
-                    className="w-full border border-slate-200 p-3 rounded-xl text-sm font-bold bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none transition text-center"
+                    className="w-full border border-slate-200 p-3 rounded-xl text-sm font-bold bg-slate-50 focus:bg-white focus:ring-2 focus:ring-[#9952FF] outline-none transition text-center"
                   />
                 </div>
               </div>
 
               <div className="pt-4 border-t border-slate-100">
-                <div className="flex justify-between items-center mb-4 text-sm font-bold bg-indigo-50 text-indigo-700 p-3 rounded-xl">
+                <div className="flex justify-between items-center mb-4 text-sm font-bold bg-[#f5eeff] text-[#4D2980] p-3 rounded-xl">
                   <span>عدد المستهدفين:</span>
                   <span className="text-lg bg-white px-2 py-0.5 rounded shadow-sm">{targetCustomers.length} زبون</span>
                 </div>
@@ -393,7 +393,7 @@ const WhatsappRetargetingPanel: React.FC = () => {
         </div>
 
         {showConfirm && (
-          <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-[#4D2980]/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <div className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-xl animate-scale-in">
               <h3 className="text-xl font-black text-slate-800 mb-2">تأكيد إرسال الحملة</h3>
               <p className="text-slate-600 mb-6 font-medium">سيتم إرسال رسائل وتس اب إلى {targetCustomers.length} زبون. هل أنت متأكد من الاستمرار؟</p>
@@ -406,7 +406,7 @@ const WhatsappRetargetingPanel: React.FC = () => {
                 </button>
                 <button 
                   onClick={startCampaign}
-                  className="flex-1 py-3 text-white font-bold bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-lg shadow-indigo-200 transition"
+                  className="flex-1 py-3 text-white font-bold bg-[#9952FF] hover:bg-[#4D2980] rounded-xl shadow-lg shadow-[#e9daff] transition"
                 >
                   نعم، ابدأ الحملة
                 </button>
@@ -416,7 +416,7 @@ const WhatsappRetargetingPanel: React.FC = () => {
         )}
 
         <div className="lg:col-span-2">
-          <div className="bg-slate-900 rounded-3xl p-6 shadow-xl border border-slate-800 h-full min-h-[400px] flex flex-col">
+          <div className="bg-[#4D2980] rounded-3xl p-6 shadow-xl border border-[#9952FF] h-full min-h-[400px] flex flex-col">
             <h3 className="font-bold text-slate-300 mb-4 flex items-center gap-2">
               <Activity size={16} className="text-green-400"/>
               سجل العمليات المباشر (Logs)
@@ -645,7 +645,7 @@ export const AdminPanel: React.FC = () => {
 
   // قاموس الألوان لكل ثيم
   const themeColors: Record<string, { primary: string; primaryHover: string; bg: string; light: string; text: string; dark: string }> = {
-    indigo:   { primary: 'bg-indigo-600', primaryHover: 'hover:bg-indigo-700', bg: 'bg-indigo-50', light: 'text-indigo-600', text: 'text-indigo-700', dark: 'from-indigo-500 to-indigo-700' },
+    indigo:   { primary: 'bg-[#9952FF]', primaryHover: 'hover:bg-[#4D2980]', bg: 'bg-[#f5eeff]', light: 'text-[#9952FF]', text: 'text-[#4D2980]', dark: 'from-[#9952FF] to-[#4D2980]' },
     emerald:  { primary: 'bg-emerald-600', primaryHover: 'hover:bg-emerald-700', bg: 'bg-emerald-50', light: 'text-emerald-600', text: 'text-emerald-700', dark: 'from-emerald-500 to-emerald-700' },
     blue:     { primary: 'bg-blue-600', primaryHover: 'hover:bg-blue-700', bg: 'bg-blue-50', light: 'text-blue-600', text: 'text-blue-700', dark: 'from-blue-500 to-blue-700' },
     purple:   { primary: 'bg-purple-600', primaryHover: 'hover:bg-purple-700', bg: 'bg-purple-50', light: 'text-purple-600', text: 'text-purple-700', dark: 'from-purple-500 to-purple-700' },
@@ -982,7 +982,7 @@ export const AdminPanel: React.FC = () => {
         className={`fixed top-4 z-[80] lg:hidden w-12 h-12 rounded-full shadow-2xl border flex items-center justify-center transition-all active:scale-95 ${
           sidebarOpen
             ? 'bg-red-500 text-white border-red-400'
-            : 'bg-white text-indigo-600 border-indigo-100'
+            : 'bg-white text-[#9952FF] border-[#e9daff]'
         }`}
         style={{ right: '16px', left: 'auto' }}
         aria-label={sidebarOpen ? 'إغلاق القائمة' : 'فتح القائمة'}
@@ -993,10 +993,10 @@ export const AdminPanel: React.FC = () => {
       {/* ==========================================
           الشريط الجانبي (Sidebar) - ينغلق آلياً بالمحمول
           ========================================== */}
-      <aside className={`admin-sidebar ${sidebarOpen ? 'admin-sidebar-open' : 'admin-sidebar-closed'} w-72 bg-gradient-to-b from-slate-900 to-slate-950 text-white p-4 flex flex-col fixed right-0 top-0 h-screen z-30 shadow-2xl transition-transform duration-300`}>
+      <aside className={`admin-sidebar ${sidebarOpen ? 'admin-sidebar-open' : 'admin-sidebar-closed'} w-72 bg-gradient-to-b from-[#4D2980] to-[#381a66] text-white p-4 flex flex-col fixed right-0 top-0 h-screen z-30 shadow-2xl transition-transform duration-300`}>
         
         {/* اللوغو */}
-        <div className="flex items-center space-x-3 space-x-reverse border-b border-slate-800 pb-4 mb-4">
+        <div className="flex items-center space-x-3 space-x-reverse border-b border-[#9952FF] pb-4 mb-4">
           <div className="p-2 bg-gradient-to-br from-red-500 to-red-700 rounded-xl shadow-lg">
             <Shield className="w-6 h-6" />
           </div>
@@ -1013,7 +1013,7 @@ export const AdminPanel: React.FC = () => {
           <button 
             onClick={() => handleTabSelect('overview')}
             className={`w-full flex items-center space-x-3 space-x-reverse px-4 py-2.5 rounded-xl transition text-sm ${
-              activeTab === 'overview' ? 'bg-slate-800 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800/50'
+              activeTab === 'overview' ? 'bg-[#9952FF] text-white shadow-md' : 'text-slate-400 hover:bg-[#9952FF]/50'
             }`}
           >
             <BarChart3 size={18} />
@@ -1024,7 +1024,7 @@ export const AdminPanel: React.FC = () => {
           <button 
             onClick={() => handleTabSelect('stores')}
             className={`w-full flex items-center space-x-3 space-x-reverse px-4 py-2.5 rounded-xl transition text-sm ${
-              activeTab === 'stores' ? 'bg-slate-800 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800/50'
+              activeTab === 'stores' ? 'bg-[#9952FF] text-white shadow-md' : 'text-slate-400 hover:bg-[#9952FF]/50'
             }`}
           >
             <StoreIcon size={18} />
@@ -1040,7 +1040,7 @@ export const AdminPanel: React.FC = () => {
           <button 
             onClick={() => handleTabSelect('customers')}
             className={`w-full flex items-center space-x-3 space-x-reverse px-4 py-2.5 rounded-xl transition text-sm ${
-              activeTab === 'customers' ? 'bg-slate-800 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800/50'
+              activeTab === 'customers' ? 'bg-[#9952FF] text-white shadow-md' : 'text-slate-400 hover:bg-[#9952FF]/50'
             }`}
           >
             <Users size={18} />
@@ -1052,7 +1052,7 @@ export const AdminPanel: React.FC = () => {
           <button 
             onClick={() => handleTabSelect('orders')}
             className={`w-full flex items-center space-x-3 space-x-reverse px-4 py-2.5 rounded-xl transition text-sm ${
-              activeTab === 'orders' ? 'bg-slate-800 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800/50'
+              activeTab === 'orders' ? 'bg-[#9952FF] text-white shadow-md' : 'text-slate-400 hover:bg-[#9952FF]/50'
             }`}
           >
             <ShoppingBag size={18} />
@@ -1068,7 +1068,7 @@ export const AdminPanel: React.FC = () => {
           <button 
             onClick={() => handleTabSelect('products')}
             className={`w-full flex items-center space-x-3 space-x-reverse px-4 py-2.5 rounded-xl transition text-sm ${
-              activeTab === 'products' ? 'bg-slate-800 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800/50'
+              activeTab === 'products' ? 'bg-[#9952FF] text-white shadow-md' : 'text-slate-400 hover:bg-[#9952FF]/50'
             }`}
           >
             <Package size={18} />
@@ -1080,7 +1080,7 @@ export const AdminPanel: React.FC = () => {
           <button 
             onClick={() => handleTabSelect('recharge')}
             className={`w-full flex items-center space-x-3 space-x-reverse px-4 py-2.5 rounded-xl transition text-sm ${
-              activeTab === 'recharge' ? 'bg-slate-800 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800/50'
+              activeTab === 'recharge' ? 'bg-[#9952FF] text-white shadow-md' : 'text-slate-400 hover:bg-[#9952FF]/50'
             }`}
           >
             <Zap size={18} className="text-emerald-400" />
@@ -1091,7 +1091,7 @@ export const AdminPanel: React.FC = () => {
           <button 
             onClick={() => handleTabSelect('promos')}
             className={`w-full flex items-center space-x-3 space-x-reverse px-4 py-2.5 rounded-xl transition text-sm ${
-              activeTab === 'promos' ? 'bg-slate-800 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800/50'
+              activeTab === 'promos' ? 'bg-[#9952FF] text-white shadow-md' : 'text-slate-400 hover:bg-[#9952FF]/50'
             }`}
           >
             <Ticket size={18} />
@@ -1103,7 +1103,7 @@ export const AdminPanel: React.FC = () => {
           <button 
             onClick={() => handleTabSelect('subscriptions')}
             className={`w-full flex items-center space-x-3 space-x-reverse px-4 py-2.5 rounded-xl transition text-sm ${
-              activeTab === 'subscriptions' ? 'bg-slate-800 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800/50'
+              activeTab === 'subscriptions' ? 'bg-[#9952FF] text-white shadow-md' : 'text-slate-400 hover:bg-[#9952FF]/50'
             }`}
           >
             <CreditCard size={18} />
@@ -1114,7 +1114,7 @@ export const AdminPanel: React.FC = () => {
           <button 
             onClick={() => handleTabSelect('flashsales')}
             className={`w-full flex items-center space-x-3 space-x-reverse px-4 py-2.5 rounded-xl transition text-sm ${
-              activeTab === 'flashsales' ? 'bg-slate-800 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800/50'
+              activeTab === 'flashsales' ? 'bg-[#9952FF] text-white shadow-md' : 'text-slate-400 hover:bg-[#9952FF]/50'
             }`}
           >
             <Zap size={18} className="text-yellow-400" />
@@ -1125,7 +1125,7 @@ export const AdminPanel: React.FC = () => {
           <button 
             onClick={() => handleTabSelect('notifications')}
             className={`w-full flex items-center space-x-3 space-x-reverse px-4 py-2.5 rounded-xl transition text-sm ${
-              activeTab === 'notifications' ? 'bg-slate-800 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800/50'
+              activeTab === 'notifications' ? 'bg-[#9952FF] text-white shadow-md' : 'text-slate-400 hover:bg-[#9952FF]/50'
             }`}
           >
             <Bell size={18} />
@@ -1143,7 +1143,7 @@ export const AdminPanel: React.FC = () => {
           <button 
             onClick={() => handleTabSelect('reviews')}
             className={`w-full flex items-center space-x-3 space-x-reverse px-4 py-2.5 rounded-xl transition text-sm ${
-              activeTab === 'reviews' ? 'bg-slate-800 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800/50'
+              activeTab === 'reviews' ? 'bg-[#9952FF] text-white shadow-md' : 'text-slate-400 hover:bg-[#9952FF]/50'
             }`}
           >
             <Star size={18} />
@@ -1159,7 +1159,7 @@ export const AdminPanel: React.FC = () => {
           <button 
             onClick={() => handleTabSelect('broadcast')}
             className={`w-full flex items-center space-x-3 space-x-reverse px-4 py-2.5 rounded-xl transition text-sm ${
-              activeTab === 'broadcast' ? 'bg-slate-800 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800/50'
+              activeTab === 'broadcast' ? 'bg-[#9952FF] text-white shadow-md' : 'text-slate-400 hover:bg-[#9952FF]/50'
             }`}
           >
             <Bell size={18} />
@@ -1170,7 +1170,7 @@ export const AdminPanel: React.FC = () => {
           <button 
             onClick={() => handleTabSelect('whatsapp')}
             className={`w-full flex items-center space-x-3 space-x-reverse px-4 py-2.5 rounded-xl transition text-sm ${
-              activeTab === 'whatsapp' ? 'bg-slate-800 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800/50'
+              activeTab === 'whatsapp' ? 'bg-[#9952FF] text-white shadow-md' : 'text-slate-400 hover:bg-[#9952FF]/50'
             }`}
           >
             <MessageCircle size={18} className="text-green-500" />
@@ -1181,7 +1181,7 @@ export const AdminPanel: React.FC = () => {
           <button 
             onClick={() => handleTabSelect('heatmap')}
             className={`w-full flex items-center space-x-3 space-x-reverse px-4 py-2.5 rounded-xl transition text-sm ${
-              activeTab === 'heatmap' ? 'bg-slate-800 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800/50'
+              activeTab === 'heatmap' ? 'bg-[#9952FF] text-white shadow-md' : 'text-slate-400 hover:bg-[#9952FF]/50'
             }`}
           >
             <Map size={18} />
@@ -1192,7 +1192,7 @@ export const AdminPanel: React.FC = () => {
           <button 
             onClick={() => handleTabSelect('database')}
             className={`w-full flex items-center space-x-3 space-x-reverse px-4 py-2.5 rounded-xl transition text-sm ${
-              activeTab === 'database' ? 'bg-slate-800 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800/50'
+              activeTab === 'database' ? 'bg-[#9952FF] text-white shadow-md' : 'text-slate-400 hover:bg-[#9952FF]/50'
             }`}
           >
             <Archive size={18} className="text-amber-400" />
@@ -1201,11 +1201,22 @@ export const AdminPanel: React.FC = () => {
 
 
 
+          {/* الإعلانات الممولة */}
+          <button 
+            onClick={() => handleTabSelect('ads')}
+            className={`w-full flex items-center space-x-3 space-x-reverse px-4 py-2.5 rounded-xl transition text-sm ${
+              activeTab === 'ads' ? 'bg-[#9952FF] text-white shadow-md' : 'text-slate-400 hover:bg-[#9952FF]/50'
+            }`}
+          >
+            <Megaphone size={18} className="text-pink-400" />
+            <span className="font-semibold">الإعلانات الممولة</span>
+          </button>
+
           {/* الإعدادات */}
           <button 
             onClick={() => handleTabSelect('settings')}
             className={`w-full flex items-center space-x-3 space-x-reverse px-4 py-2.5 rounded-xl transition text-sm ${
-              activeTab === 'settings' ? 'bg-slate-800 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800/50'
+              activeTab === 'settings' ? 'bg-[#9952FF] text-white shadow-md' : 'text-slate-400 hover:bg-[#9952FF]/50'
             }`}
           >
             <Settings size={18} />
@@ -1226,10 +1237,10 @@ export const AdminPanel: React.FC = () => {
       {/* ==========================================
           المحتوى الرئيسي
           ========================================== */}
-      <main className="flex-1 min-w-0 lg:mr-72 p-4 lg:p-6 pt-20 lg:pt-6">
+      <main className="flex-1 min-w-0 lg:mr-72 p-4 lg:p-6 pt-0 lg:pt-0 pb-20 lg:pb-6">
         
         {/* الهيدر العلوي */}
-        <header className="sticky top-0 z-10 flex justify-between items-center mb-6 bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
+        <header className="sticky top-0 z-10 flex justify-between items-center mb-6 bg-white p-4 rounded-b-2xl md:rounded-2xl shadow-sm border border-slate-200 border-t-0">
           <div className="flex items-center gap-3">
             <div>
               <h1 className="text-xl font-black text-slate-800">
@@ -1246,6 +1257,7 @@ export const AdminPanel: React.FC = () => {
                 {activeTab === 'whatsapp' && '💬 حملات الواتساب الذكية'}
                 {activeTab === 'heatmap' && '🗺️ الخريطة الحرارية للطلبات'}
                 {activeTab === 'database' && '🗄️ إدارة قاعدة البيانات'}
+                {activeTab === 'ads' && '📢 الإعلانات الممولة'}
                 {activeTab === 'settings' && '⚙️ إعدادات النظام'}
             </h1>
             <p className="text-xs text-slate-400 mt-0.5">لوحة تحكم المشرفين - منصة محلك</p>
@@ -1274,7 +1286,7 @@ export const AdminPanel: React.FC = () => {
                         className={`w-full h-10 rounded-xl transition border-2 ${
                           themeColor === c ? 'border-gray-800 scale-110 shadow-lg' : 'border-gray-200 hover:scale-105'
                         } ${
-                          c==='indigo'?'bg-indigo-500':c==='emerald'?'bg-emerald-500':c==='blue'?'bg-blue-500':c==='purple'?'bg-purple-500':c==='rose'?'bg-rose-500':'bg-amber-500'
+                          c==='indigo'?'bg-[#9952FF]':c==='emerald'?'bg-emerald-500':c==='blue'?'bg-blue-500':c==='purple'?'bg-purple-500':c==='rose'?'bg-rose-500':'bg-amber-500'
                         }`}
                         title={c==='indigo'?'نيلي':c==='emerald'?'زمردي':c==='blue'?'أزرق':c==='purple'?'بنفسجي':c==='rose'?'وردي':'عنبري'}
                       />
@@ -1475,7 +1487,7 @@ export const AdminPanel: React.FC = () => {
                           </div>
                         </div>
                         <div className="text-left">
-                          <span className="text-lg font-black text-indigo-600">{item.orderCount}</span>
+                          <span className="text-lg font-black text-[#9952FF]">{item.orderCount}</span>
                           <span className="text-[10px] text-slate-400 block">طلب</span>
                         </div>
                       </div>
@@ -1488,7 +1500,7 @@ export const AdminPanel: React.FC = () => {
             {/* حالة النظام */}
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
               <h3 className="font-bold text-slate-700 text-sm mb-4 flex items-center space-x-2 space-x-reverse">
-                <Activity size={18} className="text-indigo-500" />
+                <Activity size={18} className="text-[#9952FF]" />
                 <span>حالة إعدادات النظام</span>
               </h3>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -1502,7 +1514,7 @@ export const AdminPanel: React.FC = () => {
                 </div>
                 <div className="p-4 bg-slate-50 rounded-xl text-center">
                   <span className="text-xs text-slate-500 block mb-1">نموذج الربح</span>
-                  <span className="inline-block px-3 py-1 rounded-full text-xs font-bold bg-indigo-100 text-indigo-800">
+                  <span className="inline-block px-3 py-1 rounded-full text-xs font-bold bg-[#e9daff] text-[#4D2980]">
                     اشتراكات (بدون عمولة)
                   </span>
                 </div>
@@ -1538,7 +1550,7 @@ export const AdminPanel: React.FC = () => {
                   placeholder="ابحث باسم المتجر، المالك، اسم المستخدم، أو رقم الهاتف..." 
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full border border-slate-200 p-2 pr-9 rounded-xl text-xs text-right focus:ring-2 focus:ring-indigo-500 focus:outline-none" 
+                  className="w-full border border-slate-200 p-2 pr-9 rounded-xl text-xs text-right focus:ring-2 focus:ring-[#9952FF] focus:outline-none" 
                 />
               </div>
               
@@ -1571,7 +1583,7 @@ export const AdminPanel: React.FC = () => {
                       storeFilter === filter 
                       ? (filter === 'pending' ? 'bg-yellow-500 text-white' : 
                          filter === 'active' ? 'bg-green-500 text-white' : 
-                         filter === 'suspended' ? 'bg-red-500 text-white' : 'bg-slate-800 text-white')
+                         filter === 'suspended' ? 'bg-red-500 text-white' : 'bg-[#9952FF] text-white')
                       : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                     }`}
                   >
@@ -1618,7 +1630,7 @@ export const AdminPanel: React.FC = () => {
                             </div>
                           </td>
                           <td className="px-4 py-3 text-xs whitespace-nowrap">{store.ownerName}</td>
-                          <td className="px-4 py-3 font-mono text-xs text-indigo-600 whitespace-nowrap">@{store.username}</td>
+                          <td className="px-4 py-3 font-mono text-xs text-[#9952FF] whitespace-nowrap">@{store.username}</td>
                           <td className="px-4 py-3 font-mono text-xs whitespace-nowrap">{store.phone}</td>
                           <td className="px-4 py-3 text-xs whitespace-nowrap">{store.province}</td>
                           <td className="px-4 py-3 whitespace-nowrap">
@@ -1753,16 +1765,16 @@ export const AdminPanel: React.FC = () => {
                         <span className="text-sm font-bold text-slate-800">{selectedStore.landmark}</span>
                       </div>
                       {(selectedStore.lat && selectedStore.lng) && (
-                        <div className="bg-indigo-50 p-4 rounded-xl col-span-2 flex items-center justify-between">
+                        <div className="bg-[#f5eeff] p-4 rounded-xl col-span-2 flex items-center justify-between">
                           <div>
-                            <span className="text-[10px] text-indigo-400 font-bold block mb-1">الموقع على الخريطة</span>
-                            <span className="text-xs font-mono text-indigo-700">{selectedStore.lat.toFixed(6)}, {selectedStore.lng.toFixed(6)}</span>
+                            <span className="text-[10px] text-[#b07aff] font-bold block mb-1">الموقع على الخريطة</span>
+                            <span className="text-xs font-mono text-[#4D2980]">{selectedStore.lat.toFixed(6)}, {selectedStore.lng.toFixed(6)}</span>
                           </div>
                           <a 
                             href={`https://www.google.com/maps?q=${selectedStore.lat},${selectedStore.lng}`}
                             target="_blank"
                             rel="noreferrer"
-                            className="bg-white p-2 rounded-lg text-indigo-600 shadow-sm hover:shadow-md transition"
+                            className="bg-white p-2 rounded-lg text-[#9952FF] shadow-sm hover:shadow-md transition"
                           >
                             <Globe size={18} />
                           </a>
@@ -1783,7 +1795,7 @@ export const AdminPanel: React.FC = () => {
                       </div>
                       <div className="bg-slate-50 p-4 rounded-xl">
                         <span className="text-[10px] text-slate-400 font-bold block mb-1">الباقة الحالية</span>
-                        <span className="text-sm font-bold text-indigo-600">
+                        <span className="text-sm font-bold text-[#9952FF]">
                           {selectedStore.subscriptionId === 'sub_yearly' ? 'سنوية' : 
                            selectedStore.subscriptionId === 'sub_semi' ? 'نصف سنوية' : 'شهرية'}
                         </span>
@@ -1852,7 +1864,7 @@ export const AdminPanel: React.FC = () => {
                   placeholder="ابحث بالاسم، رقم الهاتف، أو ID الزبون..." 
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full border border-slate-200 p-2 pr-9 rounded-xl text-xs text-right focus:ring-2 focus:ring-indigo-500 focus:outline-none" 
+                  className="w-full border border-slate-200 p-2 pr-9 rounded-xl text-xs text-right focus:ring-2 focus:ring-[#9952FF] focus:outline-none" 
                 />
               </div>
               
@@ -1873,7 +1885,7 @@ export const AdminPanel: React.FC = () => {
                     className={`px-3 py-2 text-xs font-bold rounded-xl transition whitespace-nowrap ${
                       customerFilter === filter 
                       ? (filter === 'active' ? 'bg-green-500 text-white' : 
-                         filter === 'blocked' ? 'bg-red-500 text-white' : 'bg-slate-800 text-white')
+                         filter === 'blocked' ? 'bg-red-500 text-white' : 'bg-[#9952FF] text-white')
                       : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                     }`}
                   >
@@ -1913,7 +1925,7 @@ export const AdminPanel: React.FC = () => {
                     <tbody className="divide-y divide-slate-100 text-sm text-slate-700">
                       {filteredCustomers.map((customer) => (
                         <tr key={customer.id} className={`hover:bg-slate-50/50 transition ${customer.isBlocked ? 'bg-red-50/30' : ''}`}>
-                          <td className="px-4 py-3 font-mono text-xs text-indigo-600 sticky right-0 bg-white/95 backdrop-blur-sm z-10 shadow-[2px_0_5px_rgba(0,0,0,0.02)]">{customer.id}</td>
+                          <td className="px-4 py-3 font-mono text-xs text-[#9952FF] sticky right-0 bg-white/95 backdrop-blur-sm z-10 shadow-[2px_0_5px_rgba(0,0,0,0.02)]">{customer.id}</td>
                           <td className="px-4 py-3 font-bold sticky right-[80px] bg-white/95 backdrop-blur-sm z-10 shadow-[2px_0_5px_rgba(0,0,0,0.02)] whitespace-nowrap">{customer.name}</td>
                           <td className="px-4 py-3 font-mono text-xs whitespace-nowrap">{customer.phone}</td>
                           <td className="px-4 py-3 text-xs whitespace-nowrap">{customer.province}</td>
@@ -2005,16 +2017,16 @@ export const AdminPanel: React.FC = () => {
                         <span className="text-sm font-bold text-slate-800">{selectedCustomer.address || 'غير محدد'}</span>
                       </div>
                       {(selectedCustomer.lat && selectedCustomer.lng) && (
-                        <div className="bg-indigo-50 p-4 rounded-xl col-span-2 flex items-center justify-between">
+                        <div className="bg-[#f5eeff] p-4 rounded-xl col-span-2 flex items-center justify-between">
                           <div>
-                            <span className="text-[10px] text-indigo-400 font-bold block mb-1">الموقع على الخريطة</span>
-                            <span className="text-xs font-mono text-indigo-700">{selectedCustomer.lat.toFixed(6)}, {selectedCustomer.lng.toFixed(6)}</span>
+                            <span className="text-[10px] text-[#b07aff] font-bold block mb-1">الموقع على الخريطة</span>
+                            <span className="text-xs font-mono text-[#4D2980]">{selectedCustomer.lat.toFixed(6)}, {selectedCustomer.lng.toFixed(6)}</span>
                           </div>
                           <a 
                             href={`https://www.google.com/maps?q=${selectedCustomer.lat},${selectedCustomer.lng}`}
                             target="_blank"
                             rel="noreferrer"
-                            className="bg-white p-2 rounded-lg text-indigo-600 shadow-sm hover:shadow-md transition"
+                            className="bg-white p-2 rounded-lg text-[#9952FF] shadow-sm hover:shadow-md transition"
                           >
                             <Globe size={18} />
                           </a>
@@ -2024,9 +2036,9 @@ export const AdminPanel: React.FC = () => {
                         <span className="text-[10px] text-yellow-600 font-bold block mb-1">رصيد النقاط</span>
                         <span className="text-lg font-black text-yellow-700">{selectedCustomer.points} نقطة</span>
                       </div>
-                      <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
-                        <span className="text-[10px] text-indigo-600 font-bold block mb-1">المستوى</span>
-                        <span className="text-lg font-black text-indigo-700">{selectedCustomer.tier}</span>
+                      <div className="bg-[#f5eeff] p-4 rounded-xl border border-[#e9daff]">
+                        <span className="text-[10px] text-[#9952FF] font-bold block mb-1">المستوى</span>
+                        <span className="text-lg font-black text-[#4D2980]">{selectedCustomer.tier}</span>
                       </div>
                       <div className="bg-slate-50 p-4 rounded-xl">
                         <span className="text-[10px] text-slate-400 font-bold block mb-1">عدد الطلبات</span>
@@ -2085,7 +2097,7 @@ export const AdminPanel: React.FC = () => {
                   placeholder="ابحث برقم الطلب، اسم الزبون، أو اسم المتجر..." 
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full border border-slate-200 p-2 pr-9 rounded-xl text-xs text-right focus:ring-2 focus:ring-indigo-500 focus:outline-none" 
+                  className="w-full border border-slate-200 p-2 pr-9 rounded-xl text-xs text-right focus:ring-2 focus:ring-[#9952FF] focus:outline-none" 
                 />
               </div>
               
@@ -2098,7 +2110,7 @@ export const AdminPanel: React.FC = () => {
                       orderFilter === filter 
                       ? (filter === 'pending' ? 'bg-yellow-500 text-white' : 
                          filter === 'accepted' ? 'bg-green-500 text-white' : 
-                         filter === 'rejected' ? 'bg-red-500 text-white' : 'bg-slate-800 text-white')
+                         filter === 'rejected' ? 'bg-red-500 text-white' : 'bg-[#9952FF] text-white')
                       : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                     }`}
                   >
@@ -2145,7 +2157,7 @@ export const AdminPanel: React.FC = () => {
                         <div className="grid grid-cols-2 gap-4 text-xs">
                           <div>
                             <span className="text-slate-400 font-bold">المتجر:</span>
-                            <span className="font-bold text-indigo-600 mr-1">{order.storeName}</span>
+                            <span className="font-bold text-[#9952FF] mr-1">{order.storeName}</span>
                           </div>
                           <div>
                             <span className="text-slate-400 font-bold">الزبون:</span>
@@ -2189,7 +2201,7 @@ export const AdminPanel: React.FC = () => {
                           )}
                           <div className="flex justify-between pt-2 border-t border-slate-200 text-sm font-black">
                             <span>الإجمالي:</span>
-                            <span className="text-indigo-600">{(order.total || 0).toLocaleString()} د.ع</span>
+                            <span className="text-[#9952FF]">{(order.total || 0).toLocaleString()} د.ع</span>
                           </div>
                         </div>
                       </div>
@@ -2242,7 +2254,7 @@ export const AdminPanel: React.FC = () => {
                     <div className="grid grid-cols-2 gap-4 text-sm">
                       <div className="bg-slate-50 p-3 rounded-xl">
                         <span className="text-[10px] text-slate-400 font-bold block">المتجر</span>
-                        <span className="font-bold text-indigo-600">{selectedOrder.storeName}</span>
+                        <span className="font-bold text-[#9952FF]">{selectedOrder.storeName}</span>
                       </div>
                       <div className="bg-slate-50 p-3 rounded-xl">
                         <span className="text-[10px] text-slate-400 font-bold block">الزبون</span>
@@ -2262,7 +2274,7 @@ export const AdminPanel: React.FC = () => {
                       </div>
                     </div>
 
-                    <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
+                    <div className="bg-[#f5eeff] p-4 rounded-xl border border-[#e9daff]">
                       <div className="flex justify-between text-sm mb-1">
                         <span>المجموع الفرعي:</span>
                         <span>{(selectedOrder.subtotal || 0).toLocaleString()} د.ع</span>
@@ -2277,7 +2289,7 @@ export const AdminPanel: React.FC = () => {
                           <span>-{(selectedOrder.discountAmount || 0).toLocaleString()} د.ع</span>
                         </div>
                       )}
-                      <div className="flex justify-between text-lg font-black text-indigo-700 pt-2 border-t border-indigo-200">
+                      <div className="flex justify-between text-lg font-black text-[#4D2980] pt-2 border-t border-[#e9daff]">
                         <span>الإجمالي:</span>
                         <span>{(selectedOrder.total || 0).toLocaleString()} د.ع</span>
                       </div>
@@ -2331,7 +2343,7 @@ export const AdminPanel: React.FC = () => {
                   placeholder="ابحث باسم المنتج، الوصف، السعر، أو المعرف..." 
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full border border-slate-200 p-2 pr-9 rounded-xl text-xs text-right focus:ring-2 focus:ring-indigo-500 focus:outline-none" 
+                  className="w-full border border-slate-200 p-2 pr-9 rounded-xl text-xs text-right focus:ring-2 focus:ring-[#9952FF] focus:outline-none" 
                 />
               </div>
             </div>
@@ -2368,7 +2380,7 @@ export const AdminPanel: React.FC = () => {
                                       navigator.clipboard.writeText(product.id);
                                       alert(`تم نسخ معرف المنتج: ${product.id}`);
                                     }}
-                                    className="p-1 text-slate-400 hover:text-indigo-600 transition"
+                                    className="p-1 text-slate-400 hover:text-[#9952FF] transition"
                                     title="نسخ معرف المنتج"
                                   >
                                     <Copy size={10} />
@@ -2490,7 +2502,7 @@ export const AdminPanel: React.FC = () => {
                   <button 
                     onClick={handleGenerateCodes}
                     disabled={isGenerating}
-                    className="w-full bg-slate-800 text-white p-3 rounded-xl font-bold hover:bg-slate-700 transition flex items-center justify-center gap-2"
+                    className="w-full bg-[#9952FF] text-white p-3 rounded-xl font-bold hover:bg-slate-700 transition flex items-center justify-center gap-2"
                   >
                     {isGenerating ? <Loader2 className="animate-spin" size={18} /> : <Zap size={18} />}
                     توليد الكودات الآن
@@ -2520,7 +2532,7 @@ export const AdminPanel: React.FC = () => {
                       const user = customers.find(c => c.id === code.usedBy);
                       return (
                         <tr key={code.id} className="hover:bg-slate-50/50 transition">
-                          <td className="p-4 font-mono font-bold text-indigo-600">{code.code}</td>
+                          <td className="p-4 font-mono font-bold text-[#9952FF]">{code.code}</td>
                           <td className="p-4 font-bold">{code.points.toLocaleString()}</td>
                           <td className="p-4">
                             <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
@@ -2566,7 +2578,7 @@ export const AdminPanel: React.FC = () => {
                     placeholder="ابحث بكود الخصم..." 
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full border border-slate-200 p-2 pr-9 rounded-xl text-xs text-right focus:ring-2 focus:ring-indigo-500 focus:outline-none" 
+                    className="w-full border border-slate-200 p-2 pr-9 rounded-xl text-xs text-right focus:ring-2 focus:ring-[#9952FF] focus:outline-none" 
                   />
                 </div>
                 
@@ -2578,7 +2590,7 @@ export const AdminPanel: React.FC = () => {
                       className={`px-3 py-2 text-xs font-bold rounded-xl transition whitespace-nowrap ${
                         promoFilter === filter 
                         ? (filter === 'active' ? 'bg-green-500 text-white' : 
-                           filter === 'expired' ? 'bg-red-500 text-white' : 'bg-slate-800 text-white')
+                           filter === 'expired' ? 'bg-red-500 text-white' : 'bg-[#9952FF] text-white')
                         : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                       }`}
                     >
@@ -2644,12 +2656,12 @@ export const AdminPanel: React.FC = () => {
                           <tr key={promo.id} className="hover:bg-slate-50/50 transition">
                             <td className="px-4 py-3 sticky right-0 bg-white/95 backdrop-blur-sm z-10 shadow-[2px_0_5px_rgba(0,0,0,0.02)]">
                               <div className="flex items-center space-x-2 space-x-reverse whitespace-nowrap">
-                                <span className="font-black bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded-lg tracking-wider font-mono text-sm border border-indigo-200">
+                                <span className="font-black bg-[#e9daff] text-[#4D2980] px-3 py-1.5 rounded-lg tracking-wider font-mono text-sm border border-[#e9daff]">
                                   {promo.code}
                                 </span>
                                 <button 
                                   onClick={() => copyToClipboard(promo.code)}
-                                  className="p-1 text-slate-400 hover:text-indigo-600 transition"
+                                  className="p-1 text-slate-400 hover:text-[#9952FF] transition"
                                   title="نسخ الكود"
                                 >
                                   <Copy size={14} />
@@ -2893,7 +2905,7 @@ export const AdminPanel: React.FC = () => {
                   )}
                   
                   <div className="flex items-center space-x-2 space-x-reverse mb-3">
-                    <Calendar size={20} className="text-indigo-500" />
+                    <Calendar size={20} className="text-[#9952FF]" />
                     <h3 className="text-lg font-black text-slate-800">باقة {plan.name}</h3>
                   </div>
                   
@@ -2906,7 +2918,7 @@ export const AdminPanel: React.FC = () => {
                           type="number" 
                           value={newPlanPrice || plan.price}
                           onChange={(e) => setNewPlanPrice(parseInt(e.target.value) || 0)}
-                          className="w-full text-center border border-slate-300 p-3 rounded-xl text-lg font-bold focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                          className="w-full text-center border border-slate-300 p-3 rounded-xl text-lg font-bold focus:ring-2 focus:ring-[#9952FF] focus:outline-none"
                         />
                         <div className="flex gap-2">
                           <button 
@@ -2925,7 +2937,7 @@ export const AdminPanel: React.FC = () => {
                       </div>
                     ) : (
                       <>
-                        <span className="text-4xl font-black text-indigo-600">{(plan.price || 0).toLocaleString()}</span>
+                        <span className="text-4xl font-black text-[#9952FF]">{(plan.price || 0).toLocaleString()}</span>
                         <span className="text-sm text-slate-500 font-bold block mt-1">دينار عراقي</span>
                         <span className="text-[10px] text-slate-400">المدة: {plan.durationMonths} شهر</span>
                       </>
@@ -2935,7 +2947,7 @@ export const AdminPanel: React.FC = () => {
                   {editingPlanId !== plan.id && (
                     <button 
                       onClick={() => { setEditingPlanId(plan.id); setNewPlanPrice(plan.price); }}
-                      className="w-full py-3 border border-indigo-200 text-indigo-600 bg-indigo-50 hover:bg-indigo-100 font-bold text-sm rounded-xl transition flex items-center justify-center space-x-2 space-x-reverse"
+                      className="w-full py-3 border border-[#e9daff] text-[#9952FF] bg-[#f5eeff] hover:bg-[#e9daff] font-bold text-sm rounded-xl transition flex items-center justify-center space-x-2 space-x-reverse"
                     >
                       <Edit size={16} />
                       <span>تعديل السعر</span>
@@ -2980,12 +2992,12 @@ export const AdminPanel: React.FC = () => {
               ) : (
                 <div className="divide-y divide-slate-100 max-h-[600px] overflow-y-auto">
                   {notifications.slice(0, 50).map(notif => (
-                    <div key={notif.id} className={`p-4 hover:bg-slate-50 transition ${!notif.read ? 'bg-indigo-50/30' : ''}`}>
+                    <div key={notif.id} className={`p-4 hover:bg-slate-50 transition ${!notif.read ? 'bg-[#f5eeff]/30' : ''}`}>
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
                           <div className="flex items-center space-x-2 space-x-reverse mb-1">
                             <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full ${
-                              notif.role === 'merchant' ? 'bg-indigo-100 text-indigo-800' :
+                              notif.role === 'merchant' ? 'bg-[#e9daff] text-[#4D2980]' :
                               notif.role === 'customer' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                             }`}>
                               {notif.role === 'merchant' && 'تاجر'}
@@ -2999,7 +3011,7 @@ export const AdminPanel: React.FC = () => {
                             {new Date(notif.createdAt).toLocaleDateString('ar-IQ')} - {new Date(notif.createdAt).toLocaleTimeString('ar-IQ', { hour: '2-digit', minute: '2-digit' })}
                           </span>
                         </div>
-                        {!notif.read && <span className="w-2 h-2 bg-indigo-500 rounded-full"></span>}
+                        {!notif.read && <span className="w-2 h-2 bg-[#9952FF] rounded-full"></span>}
                       </div>
                     </div>
                   ))}
@@ -3033,7 +3045,7 @@ export const AdminPanel: React.FC = () => {
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
                             <div className="flex items-center space-x-2 space-x-reverse mb-1">
-                              <span className="text-xs font-bold text-indigo-800 bg-indigo-100 px-2 py-0.5 rounded-full">
+                              <span className="text-xs font-bold text-[#4D2980] bg-[#e9daff] px-2 py-0.5 rounded-full">
                                 {store ? store.shopName : 'متجر غير معروف'}
                               </span>
                               <span className="text-xs font-bold text-slate-800">{review.customerName}</span>
@@ -3065,7 +3077,7 @@ export const AdminPanel: React.FC = () => {
           <div className="space-y-6 animate-fade-in max-w-2xl">
             <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
               <h3 className="font-bold text-slate-800 text-md mb-4 pb-2 border-b border-slate-100 flex items-center space-x-2 space-x-reverse">
-                <Bell size={20} className="text-indigo-500" />
+                <Bell size={20} className="text-[#9952FF]" />
                 <span>📢 إرسال إشعار عام للزبائن</span>
               </h3>
               
@@ -3098,7 +3110,7 @@ export const AdminPanel: React.FC = () => {
               </div>
               <button 
                 onClick={() => setShowFlashSaleModal(true)}
-                className="px-6 py-2.5 bg-slate-800 text-white font-bold rounded-xl shadow-lg shadow-slate-200 hover:bg-slate-700 transition flex items-center gap-2"
+                className="px-6 py-2.5 bg-[#9952FF] text-white font-bold rounded-xl shadow-lg shadow-slate-200 hover:bg-slate-700 transition flex items-center gap-2"
               >
                 <Zap size={18} />
                 <span>إنشاء فعالية جديدة</span>
@@ -3143,7 +3155,7 @@ export const AdminPanel: React.FC = () => {
                     {sale.status !== 'ended' && (
                       <button 
                         onClick={() => updateFlashSaleStatus(sale.id, 'ended')}
-                        className="py-2.5 bg-slate-800 text-white font-bold rounded-xl hover:bg-slate-900 transition text-sm flex items-center justify-center gap-2"
+                        className="py-2.5 bg-[#9952FF] text-white font-bold rounded-xl hover:bg-[#4D2980] transition text-sm flex items-center justify-center gap-2"
                       >
                         إنهاء الفعالية
                       </button>
@@ -3157,7 +3169,7 @@ export const AdminPanel: React.FC = () => {
                           end: sale.endTime.slice(0,16)
                         });
                       }}
-                      className="py-2.5 bg-indigo-50 text-indigo-700 font-bold rounded-xl hover:bg-indigo-100 transition text-sm flex items-center justify-center gap-2"
+                      className="py-2.5 bg-[#f5eeff] text-[#4D2980] font-bold rounded-xl hover:bg-[#e9daff] transition text-sm flex items-center justify-center gap-2"
                     >
                        تعديل المواعيد
                     </button>
@@ -3185,7 +3197,7 @@ export const AdminPanel: React.FC = () => {
                               <img src={product.image || undefined} alt="" className="w-16 h-16 rounded-xl object-cover border" />
                               <div>
                                 <h6 className="font-black text-slate-800 text-sm">{product.name}</h6>
-                                <p className="text-[10px] text-indigo-600 font-bold mb-1">{store.shopName}</p>
+                                <p className="text-[10px] text-[#9952FF] font-bold mb-1">{store.shopName}</p>
                                 <div className="flex gap-4 text-[11px] text-slate-500 font-medium bg-slate-50 px-2 py-1 rounded">
                                   <span>السعر الأصلي: <del>{product.price.toLocaleString()}</del></span>
                                   <span className="text-rose-600 font-black">سعر العرض: {req.promotionalPrice.toLocaleString()} د.ع</span>
@@ -3232,7 +3244,7 @@ export const AdminPanel: React.FC = () => {
             <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 flex-1 flex flex-col">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="font-bold text-slate-800 text-lg flex items-center space-x-2 space-x-reverse">
-                  <Map size={24} className="text-indigo-500" />
+                  <Map size={24} className="text-[#9952FF]" />
                   <span>الخريطة الحرارية للطلبات</span>
                 </h3>
                 <div className="bg-amber-50 text-amber-700 px-4 py-2 rounded-xl text-sm font-bold border border-amber-200">
@@ -3265,158 +3277,14 @@ export const AdminPanel: React.FC = () => {
         {activeTab === 'database' && <DatabasePanel />}
 
         {/* ==========================================
-            تاب إعدادات النظام
+            تاب الإعلانات الممولة
             ========================================== */}
-        {activeTab === 'settings' && (
-          <div className="space-y-6 animate-fade-in max-w-3xl">
-            
+        {activeTab === 'ads' && (
+          <div className="space-y-6 animate-fade-in max-w-4xl">
             <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
               <h3 className="font-bold text-slate-800 text-md mb-4 pb-2 border-b border-slate-100 flex items-center space-x-2 space-x-reverse">
-                <Settings size={20} className="text-indigo-500" />
-                <span>إعدادات النظام العامة</span>
-              </h3>
-
-              <div className="space-y-4">
-                
-                {/* الموافقة التلقائية */}
-                <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100">
-                  <div className="text-right flex-1">
-                    <h4 className="font-bold text-slate-700 text-sm">الموافقة التلقائية على المتاجر الجديدة</h4>
-                    <p className="text-xs text-slate-500 mt-1">
-                      عند التفعيل، يتم قبول جميع المتاجر المسجلة تلقائياً بدون مراجعة يدوية من الأدمن.
-                    </p>
-                  </div>
-                  
-                  <button 
-                    onClick={toggleAutoApprove}
-                    className={`px-5 py-2.5 text-xs font-bold rounded-xl transition flex items-center space-x-2 space-x-reverse shadow-sm ${
-                      adminSettings.autoApproveStores 
-                      ? 'bg-green-500 hover:bg-green-600 text-white' 
-                      : 'bg-red-100 hover:bg-red-200 text-red-600 border border-red-200'
-                    }`}
-                  >
-                    {adminSettings.autoApproveStores ? (
-                      <>
-                        <Check size={16} />
-                        <span>مفعّلة</span>
-                      </>
-                    ) : (
-                      <>
-                        <X size={16} />
-                        <span>معطّلة</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-
-                <div className="bg-blue-50 text-blue-800 p-4 rounded-xl text-xs font-semibold leading-relaxed border border-blue-100">
-                  💡 <strong>تلميح:</strong> إذا عطّلت الموافقة التلقائية، ستظهر المتاجر الجديدة في قسم "بانتظار الموافقة" ويمكنك قبولها أو رفضها يدوياً.
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
-              <h3 className="font-bold text-slate-800 text-md mb-4 pb-2 border-b border-slate-100 flex items-center space-x-2 space-x-reverse">
-                <Award size={20} className="text-yellow-500" />
-                <span>إدارة المتاجر المميزة والقريبة</span>
-              </h3>
-              
-              <div className="space-y-6">
-                {/* إدارة المتاجر المميزة */}
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <label className="text-xs font-black text-slate-700">المتاجر المميزة (يظهر 4 في الواحدة)</label>
-                    <div className="relative w-48">
-                      <Search size={14} className="absolute right-2 top-2 text-slate-400" />
-                      <input 
-                        type="text" 
-                        placeholder="بحث باسم المتجر..." 
-                        value={storeSearch}
-                        onChange={(e) => setStoreSearch(e.target.value)}
-                        className="w-full pr-7 py-1.5 border rounded-lg text-[10px]"
-                      />
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto p-2 bg-slate-50 rounded-xl border border-slate-100">
-                    {stores
-                      .filter(s => s.status === 'active' && (s.shopName.toLowerCase().includes(storeSearch.toLowerCase()) || s.username.toLowerCase().includes(storeSearch.toLowerCase())))
-                      .map(store => (
-                        <button 
-                          key={`feat-${store.id}`}
-                          onClick={() => {
-                            const current = adminSettings.featuredStoreIds || [];
-                            const updated = current.includes(store.id)
-                              ? current.filter((id: string) => id !== store.id)
-                              : [...current, store.id];
-                            updateAdminSettings({ featuredStoreIds: updated });
-                          }}
-                          className={`px-3 py-1.5 rounded-lg text-[10px] font-bold border transition flex items-center gap-2 ${adminSettings.featuredStoreIds?.includes(store.id) ? 'bg-yellow-50 border-yellow-200 text-yellow-700' : 'bg-white border-slate-200 text-slate-500 hover:border-indigo-300'}`}
-                        >
-                          <img src={store.logo || undefined} className="w-4 h-4 rounded-full" />
-                          <span>{store.shopName}</span>
-                          <span className="text-[8px] text-slate-400 opacity-70">@{store.username}</span>
-                          {adminSettings.featuredStoreIds?.includes(store.id) && <Check size={12} />}
-                        </button>
-                      ))}
-                  </div>
-                </div>
-
-                {/* إدارة المتاجر القريبة */}
-                <div>
-                  <div className="flex items-center justify-between mb-3 pt-4 border-t border-slate-50">
-                    <div className="flex flex-col">
-                      <label className="text-xs font-black text-slate-700">المتاجر القريبة</label>
-                      <span className="text-[9px] text-slate-400 font-bold">تحكم بطريقة عرض المتاجر القريبة للزبون</span>
-                    </div>
-                    <button 
-                      onClick={() => updateAdminSettings({ enableAutoNearby: !adminSettings.enableAutoNearby })}
-                      className={`flex items-center gap-2 px-3 py-1.5 rounded-xl transition-all border ${adminSettings.enableAutoNearby ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-100' : 'bg-white border-slate-200 text-slate-500'}`}
-                    >
-                      <Zap size={14} fill={adminSettings.enableAutoNearby ? "currentColor" : "none"} />
-                      <span className="text-[10px] font-black">{adminSettings.enableAutoNearby ? 'فرز تلقائي (حسب المسافة)' : 'تحكم يدوي (بالقائمة)'}</span>
-                    </button>
-                  </div>
-
-                  {!adminSettings.enableAutoNearby ? (
-                    <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto p-2 bg-slate-50 rounded-xl border border-slate-100">
-                     {stores
-                        .filter(s => s.status === 'active' && (s.shopName.toLowerCase().includes(storeSearch.toLowerCase()) || s.username.toLowerCase().includes(storeSearch.toLowerCase())))
-                        .map(store => (
-                          <button 
-                            key={`near-${store.id}`}
-                            onClick={() => {
-                              const current = adminSettings.nearbyStoreIds || [];
-                              const updated = current.includes(store.id)
-                                ? current.filter((id: string) => id !== store.id)
-                                : [...current, store.id];
-                              updateAdminSettings({ nearbyStoreIds: updated });
-                            }}
-                            className={`px-3 py-1.5 rounded-lg text-[10px] font-bold border transition flex items-center gap-2 ${adminSettings.nearbyStoreIds?.includes(store.id) ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white border-slate-200 text-slate-500 hover:border-indigo-300'}`}
-                          >
-                            <img src={store.logo || undefined} className="w-4 h-4 rounded-full" />
-                            <span>{store.shopName}</span>
-                            <span className="text-[8px] text-slate-400 opacity-70">@{store.username}</span>
-                            {adminSettings.nearbyStoreIds?.includes(store.id) && <Check size={12} />}
-                          </button>
-                        ))}
-                    </div>
-                  ) : (
-                    <div className="p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100/50 text-center">
-                      <div className="w-10 h-10 bg-white rounded-xl shadow-sm border border-indigo-100 flex items-center justify-center mx-auto mb-2 text-indigo-600">
-                        <MapPin size={20} />
-                      </div>
-                      <p className="text-[10px] font-black text-indigo-900 mb-1">الفرز التلقائي مفعل ✅</p>
-                      <p className="text-[9px] text-indigo-600/70 font-bold">سيقوم التطبيق بترتيب المتاجر تلقائياً للزبون بناءً على موقعه الجغرافي الفعلي.</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
-              <h3 className="font-bold text-slate-800 text-md mb-4 pb-2 border-b border-slate-100 flex items-center space-x-2 space-x-reverse">
-                <Palette size={20} className="text-indigo-500" />
-                <span>إدارة الإعلانات (Ads Slider)</span>
+                <Palette size={20} className="text-[#9952FF]" />
+                <span>إعلانات تطبيق الزبون (Ads Slider)</span>
               </h3>
               <div className="space-y-4">
                 <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl">
@@ -3505,7 +3373,7 @@ export const AdminPanel: React.FC = () => {
                                 updated[index].targetId = '';
                                 updateAdminSettings({ ads: updated });
                               }}
-                              className={`flex-1 py-1 rounded-lg text-[9px] font-bold border transition ${ad.targetType === type ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'}`}
+                              className={`flex-1 py-1 rounded-lg text-[9px] font-bold border transition ${ad.targetType === type ? 'bg-[#9952FF] text-white border-[#9952FF]' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'}`}
                             >
                               {type === 'none' ? 'بدون' : type === 'store' ? 'متجر' : 'منتج'}
                             </button>
@@ -3524,7 +3392,7 @@ export const AdminPanel: React.FC = () => {
                             <Search size={14} className="absolute right-2 top-2 text-slate-400" />
                             
                             {selectedAdForTarget === index && adTargetSearch && (
-                              <div className="absolute z-20 w-full mt-1 bg-white border border-indigo-100 rounded-xl shadow-xl max-h-40 overflow-y-auto">
+                              <div className="absolute z-20 w-full mt-1 bg-white border border-[#e9daff] rounded-xl shadow-xl max-h-40 overflow-y-auto">
                                 {ad.targetType === 'store' ? (
                                   stores.filter(s => s.shopName.toLowerCase().includes(adTargetSearch.toLowerCase())).map(s => (
                                     <button 
@@ -3537,7 +3405,7 @@ export const AdminPanel: React.FC = () => {
                                         setAdTargetSearch('');
                                         setSelectedAdForTarget(null);
                                       }}
-                                      className="w-full p-2 text-right text-[10px] hover:bg-indigo-50 flex items-center space-x-2 space-x-reverse"
+                                      className="w-full p-2 text-right text-[10px] hover:bg-[#f5eeff] flex items-center space-x-2 space-x-reverse"
                                     >
                                       <img src={s.logo || undefined} className="w-5 h-5 rounded-full" />
                                       <span>{s.shopName}</span>
@@ -3547,7 +3415,7 @@ export const AdminPanel: React.FC = () => {
                                   // استهداف منتج - نبحث عن المتجر أولا
                                   stores.filter(s => s.shopName.toLowerCase().includes(adTargetSearch.toLowerCase())).map(s => (
                                     <div key={s.id} className="p-2 border-b last:border-0">
-                                      <div className="text-[9px] font-black text-indigo-600 mb-1">{s.shopName}</div>
+                                      <div className="text-[9px] font-black text-[#9952FF] mb-1">{s.shopName}</div>
                                       <div className="space-y-1">
                                         {products.filter(p => p.storeId === s.id).map(p => (
                                           <button 
@@ -3598,11 +3466,358 @@ export const AdminPanel: React.FC = () => {
                       };
                       updateAdminSettings({ ads: [...(adminSettings.ads || []), newAd] });
                     }}
-                    className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 hover:text-indigo-600 hover:border-indigo-200 transition min-h-[250px]"
+                    className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 hover:text-[#9952FF] hover:border-[#e9daff] transition min-h-[250px]"
                   >
                     <Plus size={24} />
                     <span className="text-xs font-bold mt-2">إضافة إعلان جديد</span>
                   </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Delivery Ads */}
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 mt-6">
+              <h3 className="font-bold text-slate-800 text-md mb-4 pb-2 border-b border-slate-100 flex items-center space-x-2 space-x-reverse">
+                <Truck size={20} className="text-[#9952FF]" />
+                <span>إعلانات تطبيق التاجر - شركات التوصيل</span>
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {(adminSettings.merchantDeliveryAds || []).map((ad: any, index: number) => (
+                  <div key={ad.id} className="p-4 border border-slate-100 rounded-2xl bg-white space-y-3 relative shadow-sm hover:shadow-md transition">
+                    <button 
+                      onClick={() => {
+                        const updated = (adminSettings.merchantDeliveryAds || []).filter((_: any, i: number) => i !== index);
+                        updateAdminSettings({ merchantDeliveryAds: updated });
+                      }}
+                      className="absolute top-2 left-2 p-1 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition z-10"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                    
+                    <ImageUploader 
+                      value={ad.url} 
+                      onChange={(url) => {
+                        const updated = [...(adminSettings.merchantDeliveryAds || [])];
+                        updated[index].url = url;
+                        updateAdminSettings({ merchantDeliveryAds: updated });
+                      }}
+                      label="صورة الإعلان"
+                      aspectRatio="landscape"
+                      showUrlOption={true}
+                    />
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[9px] font-bold text-gray-400 mb-1">عنوان الإعلان</label>
+                        <input 
+                          type="text" 
+                          placeholder="شركة توصيل سريعة"
+                          value={ad.title || ''} 
+                          onChange={(e) => {
+                            const updated = [...(adminSettings.merchantDeliveryAds || [])];
+                            updated[index].title = e.target.value;
+                            updateAdminSettings({ merchantDeliveryAds: updated });
+                          }}
+                          className="w-full border p-2 rounded-lg text-[10px]"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[9px] font-bold text-gray-400 mb-1">وصف قصير</label>
+                        <input 
+                          type="text" 
+                          placeholder="توصيل بأفضل الأسعار"
+                          value={ad.desc || ''} 
+                          onChange={(e) => {
+                            const updated = [...(adminSettings.merchantDeliveryAds || [])];
+                            updated[index].desc = e.target.value;
+                            updateAdminSettings({ merchantDeliveryAds: updated });
+                          }}
+                          className="w-full border p-2 rounded-lg text-[10px]"
+                        />
+                      </div>
+                    </div>
+                    
+                    <div className="pt-2 border-t border-slate-50">
+                      <label className="block text-[9px] font-bold text-gray-400 mb-1">الرابط أو رقم الهاتف</label>
+                      <input 
+                        type="text" 
+                        placeholder="https://... أو رقم هاتف"
+                        value={ad.link || ''} 
+                        onChange={(e) => {
+                          const updated = [...(adminSettings.merchantDeliveryAds || [])];
+                          updated[index].link = e.target.value;
+                          updateAdminSettings({ merchantDeliveryAds: updated });
+                        }}
+                        className="w-full border p-2 rounded-lg text-[10px]"
+                      />
+                    </div>
+                  </div>
+                ))}
+                <button 
+                  onClick={() => {
+                    const newAd = { 
+                      id: 'delivery-ad-' + Date.now(), 
+                      type: 'image', 
+                      url: '', 
+                      title: 'عنوان جديد', 
+                      desc: 'أضف وصفاً هنا', 
+                      link: '' 
+                    };
+                    updateAdminSettings({ merchantDeliveryAds: [...(adminSettings.merchantDeliveryAds || []), newAd] });
+                  }}
+                  className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 hover:text-[#9952FF] hover:border-[#e9daff] transition min-h-[250px]"
+                >
+                  <Plus size={24} />
+                  <span className="text-xs font-bold mt-2">إضافة إعلان توصيل جديد</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Media Ads */}
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 mt-6 mb-6">
+              <h3 className="font-bold text-slate-800 text-md mb-4 pb-2 border-b border-slate-100 flex items-center space-x-2 space-x-reverse">
+                <Camera size={20} className="text-[#9952FF]" />
+                <span>إعلانات تطبيق التاجر - شركات التصوير والإعلانات</span>
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {(adminSettings.merchantMediaAds || []).map((ad: any, index: number) => (
+                  <div key={ad.id} className="p-4 border border-slate-100 rounded-2xl bg-white space-y-3 relative shadow-sm hover:shadow-md transition">
+                    <button 
+                      onClick={() => {
+                        const updated = (adminSettings.merchantMediaAds || []).filter((_: any, i: number) => i !== index);
+                        updateAdminSettings({ merchantMediaAds: updated });
+                      }}
+                      className="absolute top-2 left-2 p-1 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition z-10"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                    
+                    <ImageUploader 
+                      value={ad.url} 
+                      onChange={(url) => {
+                        const updated = [...(adminSettings.merchantMediaAds || [])];
+                        updated[index].url = url;
+                        updateAdminSettings({ merchantMediaAds: updated });
+                      }}
+                      label="صورة الإعلان"
+                      aspectRatio="landscape"
+                      showUrlOption={true}
+                    />
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[9px] font-bold text-gray-400 mb-1">عنوان الإعلان</label>
+                        <input 
+                          type="text" 
+                          placeholder="شركة تصوير منتجات"
+                          value={ad.title || ''} 
+                          onChange={(e) => {
+                            const updated = [...(adminSettings.merchantMediaAds || [])];
+                            updated[index].title = e.target.value;
+                            updateAdminSettings({ merchantMediaAds: updated });
+                          }}
+                          className="w-full border p-2 rounded-lg text-[10px]"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[9px] font-bold text-gray-400 mb-1">وصف قصير</label>
+                        <input 
+                          type="text" 
+                          placeholder="تصوير احترافي بأسعار ممتازة"
+                          value={ad.desc || ''} 
+                          onChange={(e) => {
+                            const updated = [...(adminSettings.merchantMediaAds || [])];
+                            updated[index].desc = e.target.value;
+                            updateAdminSettings({ merchantMediaAds: updated });
+                          }}
+                          className="w-full border p-2 rounded-lg text-[10px]"
+                        />
+                      </div>
+                    </div>
+                    
+                    <div className="pt-2 border-t border-slate-50">
+                      <label className="block text-[9px] font-bold text-gray-400 mb-1">الرابط أو رقم الهاتف</label>
+                      <input 
+                        type="text" 
+                        placeholder="https://... أو رقم هاتف"
+                        value={ad.link || ''} 
+                        onChange={(e) => {
+                          const updated = [...(adminSettings.merchantMediaAds || [])];
+                          updated[index].link = e.target.value;
+                          updateAdminSettings({ merchantMediaAds: updated });
+                        }}
+                        className="w-full border p-2 rounded-lg text-[10px]"
+                      />
+                    </div>
+                  </div>
+                ))}
+                <button 
+                  onClick={() => {
+                    const newAd = { 
+                      id: 'media-ad-' + Date.now(), 
+                      type: 'image', 
+                      url: '', 
+                      title: 'عنوان جديد', 
+                      desc: 'أضف وصفاً هنا', 
+                      link: '' 
+                    };
+                    updateAdminSettings({ merchantMediaAds: [...(adminSettings.merchantMediaAds || []), newAd] });
+                  }}
+                  className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 hover:text-[#9952FF] hover:border-[#e9daff] transition min-h-[250px]"
+                >
+                  <Plus size={24} />
+                  <span className="text-xs font-bold mt-2">إضافة إعلان تصوير جديد</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ==========================================
+            تاب إعدادات النظام
+            ========================================== */}
+        {activeTab === 'settings' && (
+          <div className="space-y-6 animate-fade-in max-w-3xl">
+            
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+              <h3 className="font-bold text-slate-800 text-md mb-4 pb-2 border-b border-slate-100 flex items-center space-x-2 space-x-reverse">
+                <Settings size={20} className="text-[#9952FF]" />
+                <span>إعدادات النظام العامة</span>
+              </h3>
+
+              <div className="space-y-4">
+                
+                {/* الموافقة التلقائية */}
+                <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100">
+                  <div className="text-right flex-1">
+                    <h4 className="font-bold text-slate-700 text-sm">الموافقة التلقائية على المتاجر الجديدة</h4>
+                    <p className="text-xs text-slate-500 mt-1">
+                      عند التفعيل، يتم قبول جميع المتاجر المسجلة تلقائياً بدون مراجعة يدوية من الأدمن.
+                    </p>
+                  </div>
+                  
+                  <button 
+                    onClick={toggleAutoApprove}
+                    className={`px-5 py-2.5 text-xs font-bold rounded-xl transition flex items-center space-x-2 space-x-reverse shadow-sm ${
+                      adminSettings.autoApproveStores 
+                      ? 'bg-green-500 hover:bg-green-600 text-white' 
+                      : 'bg-red-100 hover:bg-red-200 text-red-600 border border-red-200'
+                    }`}
+                  >
+                    {adminSettings.autoApproveStores ? (
+                      <>
+                        <Check size={16} />
+                        <span>مفعّلة</span>
+                      </>
+                    ) : (
+                      <>
+                        <X size={16} />
+                        <span>معطّلة</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                <div className="bg-blue-50 text-blue-800 p-4 rounded-xl text-xs font-semibold leading-relaxed border border-blue-100">
+                  💡 <strong>تلميح:</strong> إذا عطّلت الموافقة التلقائية، ستظهر المتاجر الجديدة في قسم "بانتظار الموافقة" ويمكنك قبولها أو رفضها يدوياً.
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+              <h3 className="font-bold text-slate-800 text-md mb-4 pb-2 border-b border-slate-100 flex items-center space-x-2 space-x-reverse">
+                <Award size={20} className="text-yellow-500" />
+                <span>إدارة المتاجر المميزة والقريبة</span>
+              </h3>
+              
+              <div className="space-y-6">
+                {/* إدارة المتاجر المميزة */}
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="text-xs font-black text-slate-700">المتاجر المميزة (يظهر 4 في الواحدة)</label>
+                    <div className="relative w-48">
+                      <Search size={14} className="absolute right-2 top-2 text-slate-400" />
+                      <input 
+                        type="text" 
+                        placeholder="بحث باسم المتجر..." 
+                        value={storeSearch}
+                        onChange={(e) => setStoreSearch(e.target.value)}
+                        className="w-full pr-7 py-1.5 border rounded-lg text-[10px]"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto p-2 bg-slate-50 rounded-xl border border-slate-100">
+                    {stores
+                      .filter(s => s.status === 'active' && (s.shopName.toLowerCase().includes(storeSearch.toLowerCase()) || s.username.toLowerCase().includes(storeSearch.toLowerCase())))
+                      .map(store => (
+                        <button 
+                          key={`feat-${store.id}`}
+                          onClick={() => {
+                            const current = adminSettings.featuredStoreIds || [];
+                            const updated = current.includes(store.id)
+                              ? current.filter((id: string) => id !== store.id)
+                              : [...current, store.id];
+                            updateAdminSettings({ featuredStoreIds: updated });
+                          }}
+                          className={`px-3 py-1.5 rounded-lg text-[10px] font-bold border transition flex items-center gap-2 ${adminSettings.featuredStoreIds?.includes(store.id) ? 'bg-yellow-50 border-yellow-200 text-yellow-700' : 'bg-white border-slate-200 text-slate-500 hover:border-[#cba8ff]'}`}
+                        >
+                          <img src={store.logo || undefined} className="w-4 h-4 rounded-full" />
+                          <span>{store.shopName}</span>
+                          <span className="text-[8px] text-slate-400 opacity-70">@{store.username}</span>
+                          {adminSettings.featuredStoreIds?.includes(store.id) && <Check size={12} />}
+                        </button>
+                      ))}
+                  </div>
+                </div>
+
+                {/* إدارة المتاجر القريبة */}
+                <div>
+                  <div className="flex items-center justify-between mb-3 pt-4 border-t border-slate-50">
+                    <div className="flex flex-col">
+                      <label className="text-xs font-black text-slate-700">المتاجر القريبة</label>
+                      <span className="text-[9px] text-slate-400 font-bold">تحكم بطريقة عرض المتاجر القريبة للزبون</span>
+                    </div>
+                    <button 
+                      onClick={() => updateAdminSettings({ enableAutoNearby: !adminSettings.enableAutoNearby })}
+                      className={`flex items-center gap-2 px-3 py-1.5 rounded-xl transition-all border ${adminSettings.enableAutoNearby ? 'bg-[#9952FF] border-[#9952FF] text-white shadow-lg shadow-[#e9daff]' : 'bg-white border-slate-200 text-slate-500'}`}
+                    >
+                      <Zap size={14} fill={adminSettings.enableAutoNearby ? "currentColor" : "none"} />
+                      <span className="text-[10px] font-black">{adminSettings.enableAutoNearby ? 'فرز تلقائي (حسب المسافة)' : 'تحكم يدوي (بالقائمة)'}</span>
+                    </button>
+                  </div>
+
+                  {!adminSettings.enableAutoNearby ? (
+                    <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto p-2 bg-slate-50 rounded-xl border border-slate-100">
+                     {stores
+                        .filter(s => s.status === 'active' && (s.shopName.toLowerCase().includes(storeSearch.toLowerCase()) || s.username.toLowerCase().includes(storeSearch.toLowerCase())))
+                        .map(store => (
+                          <button 
+                            key={`near-${store.id}`}
+                            onClick={() => {
+                              const current = adminSettings.nearbyStoreIds || [];
+                              const updated = current.includes(store.id)
+                                ? current.filter((id: string) => id !== store.id)
+                                : [...current, store.id];
+                              updateAdminSettings({ nearbyStoreIds: updated });
+                            }}
+                            className={`px-3 py-1.5 rounded-lg text-[10px] font-bold border transition flex items-center gap-2 ${adminSettings.nearbyStoreIds?.includes(store.id) ? 'bg-[#f5eeff] border-[#e9daff] text-[#4D2980]' : 'bg-white border-slate-200 text-slate-500 hover:border-[#cba8ff]'}`}
+                          >
+                            <img src={store.logo || undefined} className="w-4 h-4 rounded-full" />
+                            <span>{store.shopName}</span>
+                            <span className="text-[8px] text-slate-400 opacity-70">@{store.username}</span>
+                            {adminSettings.nearbyStoreIds?.includes(store.id) && <Check size={12} />}
+                          </button>
+                        ))}
+                    </div>
+                  ) : (
+                    <div className="p-4 bg-[#f5eeff]/50 rounded-2xl border border-[#e9daff]/50 text-center">
+                      <div className="w-10 h-10 bg-white rounded-xl shadow-sm border border-[#e9daff] flex items-center justify-center mx-auto mb-2 text-[#9952FF]">
+                        <MapPin size={20} />
+                      </div>
+                      <p className="text-[10px] font-black text-[#4D2980] mb-1">الفرز التلقائي مفعل ✅</p>
+                      <p className="text-[9px] text-[#9952FF]/70 font-bold">سيقوم التطبيق بترتيب المتاجر تلقائياً للزبون بناءً على موقعه الجغرافي الفعلي.</p>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -3622,9 +3837,9 @@ export const AdminPanel: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <button 
                   onClick={handleExportSystem}
-                  className="flex flex-col items-center justify-center p-6 bg-white border border-slate-200 rounded-2xl hover:border-indigo-500 hover:shadow-md transition group"
+                  className="flex flex-col items-center justify-center p-6 bg-white border border-slate-200 rounded-2xl hover:border-[#9952FF] hover:shadow-md transition group"
                 >
-                  <RefreshCw size={28} className="text-indigo-600 group-hover:rotate-180 transition-transform duration-500" />
+                  <RefreshCw size={28} className="text-[#9952FF] group-hover:rotate-180 transition-transform duration-500" />
                   <span className="text-sm font-black text-slate-800 mt-2">تصدير قاعدة البيانات</span>
                   <span className="text-[10px] text-slate-400 mt-1">حفظ كل شيء في ملف واحد</span>
                 </button>
@@ -3660,7 +3875,7 @@ export const AdminPanel: React.FC = () => {
               <div className="space-y-3 text-sm text-slate-600">
                 <div className="flex justify-between border-b border-dashed border-slate-100 pb-2">
                   <span>إصدار النظام:</span>
-                  <span className="font-mono font-bold text-indigo-600">v2.0.0</span>
+                  <span className="font-mono font-bold text-[#9952FF]">v2.0.0</span>
                 </div>
                 <div className="flex justify-between border-b border-dashed border-slate-100 pb-2">
                   <span>تاريخ الإطلاق:</span>
@@ -3697,7 +3912,7 @@ export const AdminPanel: React.FC = () => {
 
       {/* مودال إدارة الأوسمة */}
       {deleteConfirmModal && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-[#4D2980]/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl animate-scale-in">
             <div className="flex flex-col items-center text-center space-y-4 mb-6">
               <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center shadow-inner">
@@ -3756,11 +3971,11 @@ export const AdminPanel: React.FC = () => {
       )}
 
       {editFlashSaleDatesModal && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-[#4D2980]/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl animate-scale-in">
-            <div className="bg-slate-800 p-4 flex justify-between items-center text-white">
+            <div className="bg-[#9952FF] p-4 flex justify-between items-center text-white">
               <h3 className="font-bold flex items-center gap-2">
-                <Clock size={18} className="text-indigo-400" />
+                <Clock size={18} className="text-[#b07aff]" />
                 تعديل مواعيد الفعالية
               </h3>
               <button onClick={() => setEditFlashSaleDatesModal(null)} className="bg-white/10 p-1.5 rounded-lg hover:bg-white/20 transition">
@@ -3769,14 +3984,14 @@ export const AdminPanel: React.FC = () => {
             </div>
             
             <div className="p-6 space-y-4">
-              <p className="text-slate-500 text-sm font-bold text-center mb-4 truncate text-indigo-600 bg-indigo-50 p-2 rounded-lg">{editFlashSaleDatesModal.name}</p>
+              <p className="text-slate-500 text-sm font-bold text-center mb-4 truncate text-[#9952FF] bg-[#f5eeff] p-2 rounded-lg">{editFlashSaleDatesModal.name}</p>
               
               <div className="space-y-4 text-right">
                 <div>
                   <label className="block text-xs font-bold text-slate-500 mb-1">وقت البدء الجديد</label>
                   <input 
                     type="datetime-local" 
-                    className="w-full p-3 bg-slate-50 rounded-xl border focus:border-indigo-500 outline-none transition font-mono text-sm text-left"
+                    className="w-full p-3 bg-slate-50 rounded-xl border focus:border-[#9952FF] outline-none transition font-mono text-sm text-left"
                     value={editFlashSaleDatesModal.start}
                     onChange={(e) => setEditFlashSaleDatesModal(prev => prev ? { ...prev, start: e.target.value } : null)}
                   />
@@ -3785,7 +4000,7 @@ export const AdminPanel: React.FC = () => {
                   <label className="block text-xs font-bold text-slate-500 mb-1">وقت الانتهاء الجديد</label>
                   <input 
                     type="datetime-local" 
-                    className="w-full p-3 bg-slate-50 rounded-xl border focus:border-indigo-500 outline-none transition font-mono text-sm text-left"
+                    className="w-full p-3 bg-slate-50 rounded-xl border focus:border-[#9952FF] outline-none transition font-mono text-sm text-left"
                     value={editFlashSaleDatesModal.end}
                     onChange={(e) => setEditFlashSaleDatesModal(prev => prev ? { ...prev, end: e.target.value } : null)}
                   />
@@ -3802,7 +4017,7 @@ export const AdminPanel: React.FC = () => {
                       setEditFlashSaleDatesModal(null);
                     }
                   }}
-                  className="flex-1 py-3 bg-indigo-600 text-white font-bold rounded-xl shadow-lg hover:bg-indigo-700 transition"
+                  className="flex-1 py-3 bg-[#9952FF] text-white font-bold rounded-xl shadow-lg hover:bg-[#4D2980] transition"
                 >
                   حفظ التعديلات
                 </button>
@@ -3819,9 +4034,9 @@ export const AdminPanel: React.FC = () => {
       )}
 
       {badgeModal.show && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-[#4D2980]/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl animate-scale-in">
-            <div className="bg-slate-800 p-4 flex justify-between items-center text-white">
+            <div className="bg-[#9952FF] p-4 flex justify-between items-center text-white">
               <h3 className="font-bold flex items-center gap-2">
                 <Award size={18} className="text-yellow-400" />
                 إدارة أوسمة المتجر
@@ -3841,12 +4056,12 @@ export const AdminPanel: React.FC = () => {
                     <label 
                       key={badge.id}
                       className={`flex items-center gap-3 p-3 rounded-2xl cursor-pointer transition border ${
-                        isSelected ? 'bg-indigo-50 border-indigo-200' : 'bg-slate-50 border-slate-200 hover:bg-slate-100'
+                        isSelected ? 'bg-[#f5eeff] border-[#e9daff]' : 'bg-slate-50 border-slate-200 hover:bg-slate-100'
                       }`}
                     >
                       <input 
                         type="checkbox"
-                        className="w-5 h-5 rounded text-indigo-600 focus:ring-0"
+                        className="w-5 h-5 rounded text-[#9952FF] focus:ring-0"
                         checked={isSelected}
                         onChange={(e) => {
                           const newBadges = e.target.checked 
@@ -3869,7 +4084,7 @@ export const AdminPanel: React.FC = () => {
                     updateStoreBadges(badgeModal.storeId, badgeModal.selectedBadges);
                     setBadgeModal({ show: false, storeId: '', selectedBadges: [] });
                   }}
-                  className="w-full py-3 bg-indigo-600 text-white font-bold rounded-xl shadow-lg hover:bg-indigo-700 transition"
+                  className="w-full py-3 bg-[#9952FF] text-white font-bold rounded-xl shadow-lg hover:bg-[#4D2980] transition"
                 >
                   حفظ الأوسمة
                 </button>
@@ -3881,9 +4096,9 @@ export const AdminPanel: React.FC = () => {
 
       {/* مودال إضافة فعالية جديدة */}
       {showFlashSaleModal && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-[#4D2980]/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl animate-scale-in">
-            <div className="bg-slate-800 p-4 flex justify-between items-center text-white">
+            <div className="bg-[#9952FF] p-4 flex justify-between items-center text-white">
               <h3 className="font-bold flex items-center gap-2">
                 <Zap size={18} className="text-yellow-400" />
                 إنشاء فعالية جديدة
@@ -3902,7 +4117,7 @@ export const AdminPanel: React.FC = () => {
                   required
                   value={newFlashSaleForm.title}
                   onChange={e => setNewFlashSaleForm(prev => ({...prev, title: e.target.value}))}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold outline-none focus:border-[#9952FF] focus:ring-1 focus:ring-[#9952FF] transition"
                   placeholder="حدث تخفيضات الشتاء..."
                 />
               </div>
@@ -3912,7 +4127,7 @@ export const AdminPanel: React.FC = () => {
                 <textarea 
                   value={newFlashSaleForm.description}
                   onChange={e => setNewFlashSaleForm(prev => ({...prev, description: e.target.value}))}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition resize-none"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold outline-none focus:border-[#9952FF] focus:ring-1 focus:ring-[#9952FF] transition resize-none"
                   placeholder="الوصف يظهر للمتاجر كدعوة للمشاركة..."
                   rows={2}
                 />
@@ -3926,7 +4141,7 @@ export const AdminPanel: React.FC = () => {
                     required
                     value={newFlashSaleForm.startDate}
                     onChange={e => setNewFlashSaleForm(prev => ({...prev, startDate: e.target.value}))}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold outline-none focus:border-[#9952FF] focus:ring-1 focus:ring-[#9952FF] transition"
                   />
                 </div>
                 <div>
@@ -3936,7 +4151,7 @@ export const AdminPanel: React.FC = () => {
                     required
                     value={newFlashSaleForm.endDate}
                     onChange={e => setNewFlashSaleForm(prev => ({...prev, endDate: e.target.value}))}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold outline-none focus:border-[#9952FF] focus:ring-1 focus:ring-[#9952FF] transition"
                   />
                 </div>
               </div>
@@ -3945,7 +4160,7 @@ export const AdminPanel: React.FC = () => {
                 <button type="button" onClick={() => setShowFlashSaleModal(false)} className="px-5 py-2.5 font-bold text-slate-500 hover:bg-slate-100 rounded-xl transition text-sm">
                   إلغاء
                 </button>
-                <button type="submit" className="px-5 py-2.5 bg-indigo-600 text-white font-bold rounded-xl shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition flex items-center space-x-2 space-x-reverse text-sm">
+                <button type="submit" className="px-5 py-2.5 bg-[#9952FF] text-white font-bold rounded-xl shadow-lg shadow-[#e9daff] hover:bg-[#4D2980] transition flex items-center space-x-2 space-x-reverse text-sm">
                   <CheckCircle size={16} />
                   <span>إنشاء الفعالية</span>
                 </button>

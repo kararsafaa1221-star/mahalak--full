@@ -52,7 +52,7 @@ export interface AppContextType {
   updateCustomerProfile: (data: Partial<Customer>) => Promise<void>;
   toggleFollowStore: (cid: string, sid: string) => void;
   toggleStoreNotification: (cid: string, sid: string) => void;
-  placeOrder: (order: any, promoId?: string) => Promise<void>;
+  placeOrder: (order: any, promoId?: string) => Promise<string>;
   convertPointsToPromo: (cid: string, points: number) => Promise<{ success: boolean; code?: string; message: string }>;
   addCustomerPoints: (cid: string, pts: number) => void;
   submitStoreReview: (review: any) => Promise<void>;
@@ -450,8 +450,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       if (promoCodeText) {
         // Reserved for future use
       }
+      return id;
     } catch (e) {
       handleFirestoreError(e, OperationType.CREATE, 'orders/' + id);
+      throw e;
     }
   };
 

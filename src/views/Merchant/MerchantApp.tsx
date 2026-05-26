@@ -4,9 +4,22 @@ import { Product, Order } from "../../types";
 import { STORE_CATEGORIES } from "../../constants";
 import { StorageService } from "../../services/storageService";
 import { showLocalNotification, requestNotificationPermission, setupPushNotifications } from "../../lib/pushNotifications";
+import { formatSafeDate, formatSafeTimeString, formatSafeDateTimeString } from "../../utils/date";
 import { motion, AnimatePresence } from "framer-motion";
 import { useReactToPrint } from "react-to-print";
 import { QRCodeSVG } from "qrcode.react";
+import { MapContainer, TileLayer, Marker } from "react-leaflet";
+import "leaflet/dist/leaflet.css";
+import L from "leaflet";
+
+// Fix leaflet marker icon issue
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png",
+  iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
+  shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
+});
+
 import {
   Store as StoreIcon,
   Package,
@@ -44,9 +57,22 @@ import {
   Search,
   MoreVertical,
   Car,
+  Sparkles,
+  Film,
+  Eye,
+  Heart,
+  Play,
+  Pause,
+  Loader2,
 } from "lucide-react";
+import { collection, doc, query, where, getDocs, deleteDoc } from "firebase/firestore";
+import { db } from "../../lib/firebase";
+import { Reel } from "../../types";
 import { ImageUploader } from "../../components/ImageUploader";
+import { UploadReel } from "../../components/UploadReel";
+import { BackgroundRemover } from "../../components/BackgroundRemover";
 import { LocationPicker } from "../../components/LocationPicker";
+import { CopyButton } from "../../components/CopyButton";
 import { sendOTP } from "../../services/otpService";
 import { Html5QrcodeScanner } from "html5-qrcode";
 import QRCode from "react-qr-code";
@@ -54,6 +80,46 @@ import QRCode from "react-qr-code";
 const notificationSound = new Audio(
   "https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3",
 );
+
+// ==========================================
+// دالة لفتح الخرائط في الموبايل
+// ==========================================
+const openNativeMapApp = (lat: number, lng: number, appType: 'google' | 'waze' = 'google') => {
+  if (!lat || !lng) {
+    alert('عذراً، إحداثيات موقع الزبون غير متوفرة لهذا الطلب.');
+    return;
+  }
+
+  if (appType === 'google') {
+    const mapUrl = `geo:${lat},${lng}?q=${lat},${lng}(موقع الزبون)`;
+    const fallbackUrl = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+    
+    try {
+      window.location.href = mapUrl;
+      setTimeout(() => {
+        if (document.hasFocus()) {
+          window.open(fallbackUrl, '_system');
+        }
+      }, 500);
+    } catch (e) {
+      window.open(fallbackUrl, '_system');
+    }
+  } else if (appType === 'waze') {
+    const mapUrl = `waze://?ll=${lat},${lng}&navigate=yes`;
+    const fallbackWazeUrl = `https://waze.com/ul?ll=${lat},${lng}&navigate=yes`;
+
+    try {
+      window.location.href = mapUrl;
+      setTimeout(() => {
+        if (document.hasFocus()) {
+          window.open(fallbackWazeUrl, '_system');
+        }
+      }, 500);
+    } catch (e) {
+      window.open(fallbackWazeUrl, '_system');
+    }
+  }
+};
 
 // ==========================================
 // لوحة التاجر - منصة محلك
@@ -88,6 +154,9 @@ export const MerchantApp: React.FC = () => {
     requestJoinFlashSale,
     addNotification,
     adminSettings,
+    updateCustomerProfile,
+    getCustomerSeqId,
+    getOrderSeqId,
   } = useApp();
 
   const [isSyncing, setIsSyncing] = useState(false);
@@ -100,26 +169,54 @@ export const MerchantApp: React.FC = () => {
   // فتح الروابط الخارجية مباشرة وبدون فتح نافذة جديدة في الموبايل أو كاباسيتور
   const openExternalUrl = (url: string) => {
     if (!url) return;
-    const isCapacitor = !!(window as any).Capacitor;
-    if (isCapacitor) {
-      window.open(url, '_system');
-      return;
-    }
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    const isIframe = window.self !== window.top;
     
-    if (isMobile || isIframe || url.includes('wa.me') || url.includes('t.me') || url.includes('messenger') || url.includes('facebook')) {
-      window.location.assign(url);
-    } else {
-      try {
-        const win = window.open(url, '_blank');
-        if (!win) {
+    const lowerUrl = url.toLowerCase();
+
+    // التحقق مما إذا كان الرابط هو لأحد تطبيقات التواصل الاجتماعي، الخرائط أو الاتصال (جوجل ماب، ويز، واتساب، تليغرام، مسنجر، إنستقرام، فيسبوك، ويب، هواتف)
+    const isAppInstallLink = 
+      lowerUrl.includes('wa.me') || 
+      lowerUrl.includes('whatsapp') || 
+      lowerUrl.includes('t.me') || 
+      lowerUrl.includes('telegram') || 
+      lowerUrl.includes('maps.google') || 
+      lowerUrl.includes('google.com/maps') || 
+      lowerUrl.includes('google.co.id/maps') || 
+      lowerUrl.includes('google.iq/maps') || 
+      lowerUrl.includes('maps.apple.com') || 
+      lowerUrl.includes('waze.com') || 
+      lowerUrl.includes('waze://') || 
+      lowerUrl.includes('messenger') || 
+      lowerUrl.includes('facebook.com') || 
+      lowerUrl.includes('instagram.com') || 
+      lowerUrl.startsWith('tel:') || 
+      lowerUrl.startsWith('mailto:');
+
+    if (isAppInstallLink) {
+      const isCapacitor = !!(window as any).Capacitor;
+      if (isCapacitor) {
+        window.open(url, '_system');
+        return;
+      }
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      const isIframe = window.self !== window.top;
+      
+      if (isMobile || isIframe) {
+        window.location.assign(url);
+      } else {
+        try {
+          const win = window.open(url, '_blank');
+          if (!win) {
+            window.location.assign(url);
+          }
+        } catch (_e) {
           window.location.assign(url);
         }
-      } catch (_e) {
-        window.location.assign(url);
       }
+      return;
     }
+
+    // الروابط العادية تنفتح داخل التطبيق
+    setIframeUrl(url);
   };
 
   // ==========================================
@@ -140,13 +237,26 @@ export const MerchantApp: React.FC = () => {
     
     // التحقق إذا كان الاشتراك ينتهي خلال 3 أيام
     if (diffDays <= 3 && diffDays > 0) {
-      const alreadyNotified = notifications.some(n => 
-        n.userId === currentMerchant.id && 
-        n.type === 'subscription' && 
-        new Date(n.createdAt).toDateString() === today.toDateString()
-      );
+      const alreadyNotified = notifications.some(n => {
+        if (n.userId !== currentMerchant.id || n.type !== 'subscription') return false;
+        
+        let notifDate = new Date();
+        if (n.createdAt) {
+          if (typeof n.createdAt.toDate === 'function') {
+            notifDate = n.createdAt.toDate();
+          } else if (n.createdAt.seconds) {
+            notifDate = new Date(n.createdAt.seconds * 1000);
+          } else {
+            notifDate = new Date(n.createdAt);
+          }
+        }
+        
+        return notifDate.toDateString() === today.toDateString();
+      });
       
-      if (!alreadyNotified) {
+      const localKey = `sub_notif_sent_${currentMerchant.id}_${today.toDateString()}`;
+      if (!alreadyNotified && !localStorage.getItem(localKey)) {
+        localStorage.setItem(localKey, 'true');
         addNotification({
           userId: currentMerchant.id,
           role: 'merchant',
@@ -166,18 +276,58 @@ export const MerchantApp: React.FC = () => {
     | "customers"
     | "profile"
     | "flashsales"
+    | "reels"
   >("home");
   const [showNotifications, setShowNotifications] = useState(false);
+  const [iframeUrl, setIframeUrl] = useState<string | null>(null);
 
   // ==========================================
   // نظام التزامن مع تاريخ المتصفح لدعم رجوع الأندرويد وإيماءات اليد (للتاجر)
   // ==========================================
   const isPopStateRef = React.useRef(false);
 
+  const getMerchantHashUrl = (state: any) => {
+    let sub = '';
+    if (state.view === 'login') sub = '/login';
+    else if (state.view === 'signup') sub = '/signup';
+    else if (state.view === 'dashboard') {
+      if (state.showNotifications) {
+        sub = '/notifications';
+      } else {
+        sub = `/${state.activeTab}`;
+      }
+    }
+    return `#/merchant${sub}`;
+  };
+
+  const parseMerchantHashToState = (hash: string) => {
+    const path = hash.replace('#/merchant', '');
+    const parts = path.split('/').filter(Boolean);
+    
+    const state: any = {
+      view: 'dashboard',
+      activeTab: 'home',
+      showNotifications: false
+    };
+
+    if (parts[0] === 'login') {
+      state.view = 'login';
+    } else if (parts[0] === 'signup') {
+      state.view = 'signup';
+    } else if (parts[0] === 'notifications') {
+      state.view = 'dashboard';
+      state.showNotifications = true;
+    } else if (parts[0]) {
+      state.view = 'dashboard';
+      state.activeTab = parts[0] as any;
+    }
+    return state;
+  };
+
   React.useEffect(() => {
     const handlePopState = (event: PopStateEvent) => {
-      const state = event.state;
-      if (state && state.isAppNavMerchant) {
+      const state = event.state || parseMerchantHashToState(window.location.hash);
+      if (state && (state.isAppNavMerchant || window.location.hash.startsWith('#/merchant'))) {
         isPopStateRef.current = true;
 
         if (state.view !== undefined && state.view !== view) {
@@ -210,6 +360,7 @@ export const MerchantApp: React.FC = () => {
       showNotifications
     };
 
+    const hashUrl = getMerchantHashUrl(currentState);
     const historyState = window.history.state;
     if (historyState && historyState.isAppNavMerchant) {
       const isSame = 
@@ -218,10 +369,10 @@ export const MerchantApp: React.FC = () => {
         historyState.showNotifications === currentState.showNotifications;
 
       if (!isSame) {
-        window.history.pushState(currentState, "");
+        window.history.pushState(currentState, "", hashUrl);
       }
     } else {
-      window.history.replaceState({ ...currentState, isInitialMerchant: true }, "");
+      window.history.replaceState({ ...currentState, isInitialMerchant: true }, "", hashUrl);
     }
   }, [view, activeTab, showNotifications]);
 
@@ -409,6 +560,7 @@ https://mahallak.app/store/${data.id}`
     useState<Product["discountType"]>("none");
   const [prodDiscountValue, setProdDiscountValue] = useState(0);
   const [prodImage, setProdImage] = useState("");
+  const [showBgRemoverModal, setShowBgRemoverModal] = useState(false);
   const [prodIsFreeDelivery, setProdIsFreeDelivery] = useState(false);
   const [prodStatus, setProdStatus] = useState<Product["status"]>("published");
   const [productFilterStatus, setProductFilterStatus] =
@@ -446,6 +598,19 @@ https://mahallak.app/store/${data.id}`
   const [showQRMenu, setShowQRMenu] = useState(false);
   const [activeMenuProductId, setActiveMenuProductId] = useState<string | null>(null);
 
+  // Click outside listener for product popup menu
+  useEffect(() => {
+    if (!activeMenuProductId) return;
+    const handleOutsideClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest(".product-menu-container")) {
+        setActiveMenuProductId(null);
+      }
+    };
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, [activeMenuProductId]);
+
   const toggleSelectProduct = (id: string) => {
     setSelectedProductIds((prev) =>
       prev.includes(id) ? prev.filter((pid) => pid !== id) : [...prev, id],
@@ -464,11 +629,6 @@ https://mahallak.app/store/${data.id}`
     if (selectedProductIds.length === 0) return;
 
     const count = selectedProductIds.length;
-    if (
-      !window.confirm(`هل أنت متأكد من تحديث ${count} منتج دفعة واحدة؟`)
-    )
-      return;
-
     try {
       for (const id of selectedProductIds) {
         await updateProduct(id, bulkUpdateData);
@@ -510,7 +670,11 @@ https://mahallak.app/store/${data.id}`
     customerId: string;
     customerName: string;
   }>({ show: false, customerId: "", customerName: "" });
+  const [giftType, setGiftType] = useState<"promo" | "product">("promo");
   const [giftAmount, setGiftAmount] = useState(1000);
+  const [giftDiscountType, setGiftDiscountType] = useState<"amount" | "percent">("amount");
+  const [giftExpiryDays, setGiftExpiryDays] = useState(30);
+  const [giftProductId, setGiftProductId] = useState("");
 
   const invoiceRef = useRef<HTMLDivElement>(null);
 
@@ -605,8 +769,70 @@ https://mahallak.app/store/${data.id}`
     name: string;
   }>({ show: false, id: "", name: "" });
 
+  const [blockConfirm, setBlockConfirm] = useState<{
+    show: boolean;
+    customerId: string;
+    name: string;
+    isBlocked: boolean;
+  }>({ show: false, customerId: "", name: "", isBlocked: false });
+
   const [audienceSearchQuery, setAudienceSearchQuery] = useState("");
   const [selectedAudienceId, setSelectedAudienceId] = useState<string | null>(null);
+
+  // ==========================================
+  // نظام إدارة مقاطع الريلز الخاصة بالتاجر
+  // ==========================================
+  const [merchantReels, setMerchantReels] = useState<Reel[]>([]);
+  const [loadingReels, setLoadingReels] = useState(false);
+  const [reelsTabMode, setReelsTabMode] = useState<"list" | "create" | "edit">("list");
+  const [editingReel, setEditingReel] = useState<Reel | null>(null);
+
+  const fetchMerchantReels = React.useCallback(async () => {
+    if (!currentMerchant?.id) return;
+    setLoadingReels(true);
+    try {
+      const reelsRef = collection(db, "reels");
+      const q = query(reelsRef, where("merchantId", "==", currentMerchant.id));
+      const querySnapshot = await getDocs(q);
+      const fetched: Reel[] = [];
+      querySnapshot.forEach((docSnap) => {
+        fetched.push({ id: docSnap.id, ...docSnap.data() } as Reel);
+      });
+      fetched.sort((a, b) => {
+        const timeA = a.createdAt?.seconds ? a.createdAt.seconds : 0;
+        const timeB = b.createdAt?.seconds ? b.createdAt.seconds : 0;
+        return timeB - timeA;
+      });
+      setMerchantReels(fetched);
+    } catch (err) {
+      console.error("Error fetching merchant reels:", err);
+    } finally {
+      setLoadingReels(false);
+    }
+  }, [currentMerchant]);
+
+  useEffect(() => {
+    if (activeTab === "reels" && currentMerchant?.id) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      fetchMerchantReels();
+    }
+  }, [activeTab, currentMerchant?.id, fetchMerchantReels]);
+
+  const handleDeleteReel = async (reelId: string) => {
+    if (!window.confirm("هل أنت متأكد من حذف هذا الريل نهائياً؟")) return;
+    try {
+      await deleteDoc(doc(db, "reels", reelId));
+      setMerchantReels((prev) => prev.filter((r) => r.id !== reelId));
+    } catch (err) {
+      console.error("Error deleting reel:", err);
+      alert("فشل حذف مقطع الريل. يرجى المحاولة لاحقاً.");
+    }
+  };
+
+  const handleStartEditReel = (reel: Reel) => {
+    setEditingReel(reel);
+    setReelsTabMode("edit");
+  };
 
   // ==========================================
   // التحديث اللحظي للطلبات (Placeholder)
@@ -1194,12 +1420,31 @@ https://mahallak.app/store/${data.id}`
     }
   };
 
-  const handleArchiveProduct = (id: string) => {
-    updateProduct(id, { status: "archived" });
+  const handleArchiveProduct = async (id: string) => {
+    try {
+      await updateProduct(id, { status: "archived" });
+      alert("✅ تم نقل المنتج إلى الأرشيف بنجاح!");
+    } catch (e) {
+      alert("❌ فشل نقل المنتج إلى الأرشيف");
+    }
   };
 
-  const handlePublishProduct = (id: string) => {
-    updateProduct(id, { status: "published" });
+  const handlePublishProduct = async (id: string) => {
+    try {
+      await updateProduct(id, { status: "published" });
+      alert("✅ تم نشر المنتج على المتجر بنجاح!");
+    } catch (e) {
+      alert("❌ فشل نشر المنتج");
+    }
+  };
+
+  const handleDraftProduct = async (id: string) => {
+    try {
+      await updateProduct(id, { status: "draft" });
+      alert("✅ تم نقل المنتج إلى المسودة بنجاح!");
+    } catch (e) {
+      alert("❌ فشل نقل المنتج إلى المسودة");
+    }
   };
 
   const handleCreatePromo = async (e: React.FormEvent) => {
@@ -1241,6 +1486,74 @@ https://mahallak.app/store/${data.id}`
       setPExpiryDays(30);
     } catch (err) {
       console.error("Error creating promo code:", err);
+    }
+  };
+
+  const handleSendGift = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const audId = giftModal.customerId;
+    if (!audId) return;
+
+    try {
+      if (giftType === "promo") {
+        const code = "GIFT-" + Math.floor(100000 + Math.random() * 900000);
+        
+        const expDate = new Date();
+        expDate.setDate(expDate.getDate() + giftExpiryDays);
+        const expiresAt = expDate.toISOString().split("T")[0];
+        const startDate = new Date().toISOString().split("T")[0];
+
+        const promoData = {
+          storeId: currentMerchant!.id,
+          code: code,
+          discountType: giftDiscountType,
+          discountValue: giftAmount,
+          maxUses: 1,
+          maxUsesPerUser: 1,
+          startDate: startDate,
+          expiresAt: expiresAt,
+          source: "points" as any,
+          ownerCustomerId: audId,
+        };
+
+        await createPromoCode(promoData);
+
+        await addNotification({
+          userId: audId,
+          role: "customer",
+          title: "هدية خاصة من المتجر! 🎁🎟️",
+          message: `أرسل لك متجر ${currentMerchant!.shopName} كود خصم خاص بقيمة ${giftAmount.toLocaleString()} ${giftDiscountType === "amount" ? "د.ع" : "%"}! الرمز: ${code} (صالح للاستخدام لمرة واحدة خلال ${giftExpiryDays} أيام).`,
+          type: "promo"
+        });
+
+        alert(`تم إرسال كود الخصم الهدية #${code} بنجاح إلى ${giftModal.customerName}! 🎉`);
+      } else {
+        const selectedProd = products.find(p => p.id === giftProductId);
+        if (!selectedProd) {
+          alert("الرجاء اختيار منتج صحيح");
+          return;
+        }
+
+        await addNotification({
+          userId: audId,
+          role: "customer",
+          title: "لقد تلقيت هديّة منتج! 🎁🎉",
+          message: `مبروك! لقد أهداك متجر ${currentMerchant!.shopName} منتج: "${selectedProd.name}" مجاناً كرمز تقدير لولائك! توصل مع المتجر لتنسيق الاستلام.`,
+          type: "product"
+        });
+
+        alert(`تم إرسال هدية المنتج (${selectedProd.name}) بنجاح إلى ${giftModal.customerName}! 🎉`);
+      }
+
+      setGiftModal({ show: false, customerId: "", customerName: "" });
+      setGiftType("promo");
+      setGiftAmount(1000);
+      setGiftDiscountType("amount");
+      setGiftExpiryDays(30);
+      setGiftProductId("");
+    } catch (err) {
+      console.error("Error sending gift:", err);
+      alert("حدث خطأ أثناء إرسال الهدية. يرجى المحاولة لاحقاً.");
     }
   };
 
@@ -1305,9 +1618,8 @@ https://mahallak.app/store/${data.id}`
             {[
               { id: "home", icon: StoreIcon, label: "الرئيسية" },
               { id: "products", icon: Package, label: "المنتجات" },
+              { id: "reels", icon: Film, label: "ريلز التسوق" },
               { id: "orders", icon: ClipboardList, label: "الطلبات" },
-              { id: "promo", icon: Ticket, label: "الخصومات" },
-              { id: "flashsales", icon: Gift, label: "الفعاليات" },
               { id: "customers", icon: Users, label: "زبائني" },
               { id: "profile", icon: User, label: "حسابي" },
             ].map((item) => (
@@ -1340,9 +1652,8 @@ https://mahallak.app/store/${data.id}`
           {[
             { id: "home", icon: StoreIcon, label: "الرئيسية" },
             { id: "products", icon: Package, label: "المنتجات" },
+            { id: "reels", icon: Film, label: "ريلز" },
             { id: "orders", icon: ClipboardList, label: "الطلبات" },
-            { id: "promo", icon: Ticket, label: "الخصومات" },
-            { id: "flashsales", icon: Gift, label: "الفعاليات" },
             { id: "customers", icon: Users, label: "زبائني" },
             { id: "profile", icon: User, label: "حسابي" },
           ].map((item) => (
@@ -1439,7 +1750,7 @@ https://mahallak.app/store/${data.id}`
                             </div>
                             <p className="text-[10px] text-slate-500 font-bold leading-relaxed">{notif.message}</p>
                             <span className="text-[8px] text-slate-400 block mt-1">
-                              {new Date(notif.createdAt).toLocaleTimeString("ar-IQ", { hour: '2-digit', minute: '2-digit' })}
+                              {formatSafeDateTimeString(notif.createdAt, "ar-IQ", { dateStyle: 'short', timeStyle: 'short' })}
                             </span>
                           </div>
                         ))}
@@ -1614,6 +1925,24 @@ https://mahallak.app/store/${data.id}`
                     color: "text-emerald-600",
                     tab: "home"
                   },
+                  {
+                    label: "الريلز المرفوعة",
+                    val: merchantReels.filter(r => r.merchantId === currentMerchant.id).length || 0,
+                    color: "text-blue-500",
+                    tab: "reels"
+                  },
+                  {
+                    label: "التقييمات",
+                    val: currentMerchant.rating ? `${currentMerchant.rating.toFixed(1)} / 5` : "0",
+                    color: "text-amber-500",
+                    tab: "home"
+                  },
+                  {
+                    label: "عروض فلاش سيلز",
+                    val: flashSales.filter(f => f.itemStoreId === currentMerchant.id && f.status === "active").length,
+                    color: "text-red-500",
+                    tab: "home"
+                  },
                 ].map((s, i) => (
                   <div
                     key={i}
@@ -1639,6 +1968,10 @@ https://mahallak.app/store/${data.id}`
                   <h4 className="text-lg font-black text-[#4D2980] mb-2">
                     شارك متجرك 📣
                   </h4>
+                  <div className="flex items-center gap-1.5 mb-3 bg-slate-50 border border-slate-100 p-2.5 rounded-xl text-xs font-mono text-slate-600 select-all max-w-md">
+                    <span className="truncate">https://mahallak.app/store/{currentMerchant?.id}</span>
+                    <CopyButton text={`https://mahallak.app/store/${currentMerchant?.id}`} size={11} className="shrink-0" />
+                  </div>
                   <p className="text-xs text-slate-500 mb-6 leading-relaxed">
                     قم بمشاركة رابط المتجر الرسمي الخاص بك على منصات التواصل
                     الاجتماعي لجذب المزيد من الزبائن وزيادة مبيعاتك.
@@ -1652,6 +1985,395 @@ https://mahallak.app/store/${data.id}`
                   </button>
                 </div>
               </div>
+
+              {/* أكواد الخصم والخصومات المضافة */}
+              <div className="space-y-6 pt-2">
+                <div className="bg-white p-6 rounded-2xl shadow-sm border flex justify-between items-center">
+                  <div>
+                    <h2 className="text-lg font-bold">أكواد الخصم 🎫</h2>
+                  </div>
+                  <button
+                    onClick={() => setPromoModal(true)}
+                    className="px-4 py-2 bg-[#9952FF] text-white font-bold rounded-xl shadow-md flex items-center space-x-2 space-x-reverse"
+                  >
+                    <Plus size={18} />
+                    <span>إنشاء كود خَصم</span>
+                  </button>
+                </div>
+                {merchantPromos.length === 0 ? (
+                  <div className="bg-white p-8 rounded-2xl border text-center text-slate-400">
+                    لا توجد أكواد خصم نشطة حالياً. اضغط على الزر أعلاه لإنشاء كود أول.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {merchantPromos.map((p) => (
+                      <div
+                        key={p.id}
+                        className="bg-white p-5 rounded-2xl border shadow-sm"
+                      >
+                        <div className="flex justify-between items-center mb-3">
+                          <div className="flex items-center gap-1">
+                            <code className="bg-slate-50 text-slate-700 px-3 py-1.5 rounded-xl font-black tracking-wider">
+                              {p.code}
+                            </code>
+                            <CopyButton text={p.code} size={11} />
+                          </div>
+                          <span
+                            className={`px-2 py-0.5 text-[10px] font-bold rounded-full ${p.status === "active" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}
+                          >
+                            {p.status === "active" ? "فعال" : "منتهي"}
+                          </span>
+                        </div>
+                        <span className="text-lg font-black">
+                          {(p.discountValue || 0).toLocaleString()}{" "}
+                          {p.discountType === "percent" ? "%" : "د.ع"}
+                        </span>
+                        <div className="flex justify-between mt-3 text-xs text-slate-500">
+                          <p>
+                            استخدام: {p.usedCount}/{p.maxUses}
+                          </p>
+                          {p.maxUsesPerUser && <p>حصة الفرد: {p.maxUsesPerUser}</p>}
+                        </div>
+                        <p className="text-[10px] text-slate-400 mt-2 bg-slate-50 p-1.5 rounded-lg text-center">
+                          {p.startDate
+                            ? `${formatSafeDate(p.startDate)} إلى `
+                            : ""}
+                          {p.expiresAt
+                            ? formatSafeDate(p.expiresAt)
+                            : "مستمر"}
+                        </p>
+                        <div className="flex justify-between items-center mt-3 pt-3 border-t">
+                          <button
+                            onClick={() => togglePromoCodeStatus(p.id)}
+                            className={`text-xs font-bold px-3 py-1.5 rounded-xl transition ${
+                              p.status === "active"
+                                ? "bg-orange-50 text-orange-600 hover:bg-orange-100"
+                                : "bg-green-50 text-green-600 hover:bg-green-100"
+                            }`}
+                          >
+                            {p.status === "active" ? "إيقاف" : "تفعيل"}
+                          </button>
+                          <button
+                            onClick={() => deletePromoCode(p.id)}
+                            className="p-1.5 text-red-400 bg-red-50 hover:bg-red-500 hover:text-white rounded-xl transition"
+                            title="حذف الكود نهائياً"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* الفعاليات المركزية */}
+              <div className="space-y-4 pt-4 border-t border-slate-100">
+                <div className="bg-gradient-to-l from-yellow-50 to-white rounded-2xl border shadow-sm p-6 overflow-hidden relative text-right">
+                  <div className="absolute top-0 right-0 p-4 opacity-10">
+                    <Zap size={100} className="text-yellow-500" />
+                  </div>
+                  <div className="relative z-10 text-right">
+                    <h3 className="font-black text-2xl text-[#4D2980] flex items-center space-x-2 space-x-reverse mb-2 justify-start">
+                      <Zap size={24} className="text-yellow-500" />
+                      <span>الفعاليات المركزية (Flash Sales)</span>
+                    </h3>
+                    <p className="text-xs text-slate-500 max-w-sm">
+                      شارك بمنتجاتك في الفعاليات المركزية وحقق مبيعات ضخمة خلال
+                      فترة قصيرة!
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4">
+                  {flashSales.filter((s) => s.status !== "ended" && s.status !== "paused").length === 0 ? (
+                    <div className="bg-white p-12 rounded-2xl border shadow-sm text-center">
+                      <Gift size={48} className="mx-auto text-slate-200 mb-4" />
+                      <p className="font-bold text-slate-400">
+                        لا توجد فعاليات مركزية حالياً
+                      </p>
+                    </div>
+                  ) : (
+                    flashSales
+                      .filter((s) => s.status !== "ended" && s.status !== "paused")
+                      .map((sale) => {
+                        const isUpcoming = new Date() < new Date(sale.startTime);
+                        const myRequests = flashSaleRequests.filter(
+                          (r) =>
+                            r.flashSaleId === sale.id &&
+                            r.storeId === currentMerchant.id,
+                        );
+                        return (
+                          <div
+                            key={sale.id}
+                            className="bg-white rounded-2xl border shadow-sm p-6 text-right"
+                          >
+                            <div className="flex justify-between items-start mb-4">
+                              <div>
+                                <h4 className="font-black text-lg text-[#4D2980]">
+                                  {sale.title}
+                                </h4>
+                                <p className="text-xs text-slate-500 mt-1">
+                                  {sale.description}
+                                </p>
+                              </div>
+                              {(sale.status === "upcoming" && isUpcoming) && (
+                                <span className="px-3 py-1 bg-amber-100 text-amber-700 text-[10px] font-bold rounded-full border border-amber-200">
+                                  تبدأ قريباً
+                                </span>
+                              )}
+                              {(sale.status === "active" || (!isUpcoming)) && (
+                                <span className="px-3 py-1 bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded-full border border-emerald-200 flex items-center gap-1">
+                                  <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-ping"></div>
+                                  فعالية نشطة الآن
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="flex gap-4 mb-6 text-[11px] font-bold text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-100">
+                              <div>
+                                يبدأ:{" "}
+                                <span
+                                  className="font-mono text-[#4D2980]"
+                                  dir="ltr"
+                                >
+                                  {formatSafeDateTimeString(sale.startTime)}
+                                </span>
+                              </div>
+                              <div>
+                                ينتهي:{" "}
+                                <span
+                                  className="font-mono text-[#4D2980]"
+                                  dir="ltr"
+                                >
+                                  {formatSafeDateTimeString(sale.endTime)}
+                                </span>
+                              </div>
+                            </div>
+
+                            {sale.status === "active" &&
+                              myRequests.length === 0 && (
+                                <div className="bg-rose-50 text-rose-600 p-3 rounded-xl text-xs font-bold mb-4 border border-rose-100 text-center">
+                                  لا يمكنك المشاركة لأن الفعالية قد بدأت بالفعل.
+                                  يرجى التقديم في الفعاليات القادمة مسبقاً.
+                                </div>
+                              )}
+
+                            <div className="space-y-3">
+                              <h5 className="font-bold text-slate-700 text-xs flex justify-between items-center pb-2 border-b">
+                                <span>
+                                  منتجاتك المشاركة ({myRequests.length})
+                                </span>
+                                {(sale.status === "upcoming" && isUpcoming) && (
+                                  <button
+                                    onClick={() =>
+                                      setJoinFlashSaleData({
+                                        flashSaleId: sale.id,
+                                      })
+                                    }
+                                    className="px-3 py-1 bg-slate-50 text-[#4D2980] rounded-lg font-bold text-[10px] hover:bg-slate-100 transition"
+                                  >
+                                    + طلب مشاركة لمنتج
+                                  </button>
+                                )}
+                              </h5>
+
+                              {myRequests.length === 0 && (
+                                <div className="text-center text-slate-400 py-4 text-xs font-bold bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                                  لم يتم مشاركه لمنتج
+                                </div>
+                              )}
+
+                              {myRequests.map((req) => {
+                                const p = products.find(
+                                  (prod) => prod.id === req.productId,
+                                );
+                                if (!p) return null;
+                                return (
+                                  <div
+                                    key={req.id}
+                                    className="flex justify-between items-center p-3 bg-white border border-slate-100 rounded-2xl shadow-sm"
+                                  >
+                                    <div className="flex items-center gap-3">
+                                      <img
+                                        src={p.image || undefined}
+                                        className="w-10 h-10 rounded-xl object-cover"
+                                      />
+                                      <div>
+                                        <h6 className="font-black text-[11px] text-[#4D2980]">
+                                          {p.name}
+                                        </h6>
+                                        <div className="flex gap-2 text-[9px] mt-0.5">
+                                          <span className="text-slate-400">
+                                            أصلي:{" "}
+                                            <del>{p.price.toLocaleString()}</del>
+                                          </span>
+                                          <span className="text-rose-600 font-black">
+                                            حالي:{" "}
+                                            {req.promotionalPrice.toLocaleString()}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                    <div>
+                                      {req.status === "pending" && (
+                                        <span className="px-2 py-1 bg-slate-100 text-slate-600 font-bold text-[9px] rounded uppercase">
+                                          قيد المراجعة
+                                        </span>
+                                      )}
+                                      {req.status === "approved" && (
+                                        <span className="px-2 py-1 bg-emerald-100 text-emerald-700 font-bold text-[9px] rounded uppercase">
+                                          مقبول
+                                        </span>
+                                      )}
+                                      {req.status === "rejected" && (
+                                        <span className="px-2 py-1 bg-rose-100 text-rose-700 font-bold text-[9px] rounded uppercase">
+                                          مرفوض
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === "reels" && (
+            <div className="space-y-6 animate-fade-in max-w-2xl mx-auto" dir="rtl">
+              {reelsTabMode === "list" ? (
+                <div className="space-y-5">
+                  <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <div>
+                      <h2 className="text-xl font-black text-slate-900 font-tajawal flex items-center gap-2">
+                        <Film className="text-[#9952FF]" size={22} />
+                        <span>منشورات الريلز الخاصة بك 🎬</span>
+                      </h2>
+                      <p className="text-xs text-slate-500 font-medium mt-1">إهتم بزيادة مبيعاتك بنشر مقاطع قصيرة تشرح جودة منتجاتك وتوفر تسوقاً مباشراً وسهلاً للمشترين!</p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setEditingReel(null);
+                        setReelsTabMode("create");
+                      }}
+                      className="whitespace-nowrap px-5 py-3 bg-[#9952FF] hover:bg-[#853df2] text-white font-black rounded-2xl shadow-lg shadow-[#9952FF]/10 flex items-center gap-2 transition active:scale-95"
+                    >
+                      <Plus size={18} />
+                      <span>إضافة ريلز</span>
+                    </button>
+                  </div>
+
+                  {loadingReels ? (
+                    <div className="bg-white p-12 rounded-3xl border border-slate-100 shadow-sm flex flex-col items-center justify-center text-center gap-3">
+                      <Loader2 size={32} className="animate-spin text-[#9952FF]" />
+                      <p className="text-xs text-slate-500 font-bold">جاري تحميل منشورات الريلز...</p>
+                    </div>
+                  ) : merchantReels.length === 0 ? (
+                    <div className="bg-white p-12 rounded-3xl border border-slate-100 shadow-sm text-center">
+                      <Film size={48} className="mx-auto text-slate-200 mb-4" />
+                      <h3 className="font-black text-base text-slate-800 font-tajawal">لم تقم بنشر أي ريلز بعد!</h3>
+                      <p className="text-xs text-slate-400 font-medium mt-2 max-w-xs mx-auto">
+                        سارع بنشر مقاطع فيديو قصيرة حول منتجاتك لتتحول لخيارات تسوق فورية لزبائن المتجر وتكسب انتشاراً أسرع!
+                      </p>
+                      <button
+                        onClick={() => {
+                          setEditingReel(null);
+                          setReelsTabMode("create");
+                        }}
+                        className="mt-5 px-5 py-2.5 bg-[#9952FF]/10 text-[#9952FF] font-black text-xs rounded-xl hover:bg-[#9952FF]/15 transition"
+                      >
+                        + انشر أول ريلز لمتجرك الآن
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {merchantReels.map((reel) => {
+                        const prod = products.find((p) => p.id === reel.linkedProductId);
+                        return (
+                          <div key={reel.id} className="bg-white overflow-hidden rounded-2xl border border-slate-100 shadow-sm flex gap-4 p-4 items-center">
+                            {/* Video container */}
+                            <div className="relative w-24 h-36 bg-slate-900 rounded-xl overflow-hidden shrink-0 group">
+                              <video
+                                src={reel.videoUrl}
+                                preload="metadata"
+                                className="w-full h-full object-cover"
+                                muted
+                                playsInline
+                              />
+                              <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition duration-200">
+                                <Play size={20} className="text-white fill-current" />
+                              </div>
+                            </div>
+
+                            {/* Reel Info */}
+                            <div className="flex-1 min-w-0 pr-1 flex flex-col justify-between h-36 py-1 text-right">
+                              <div>
+                                <h3 className="text-sm font-black text-slate-950 font-tajawal truncate mb-2">
+                                  {prod ? prod.name : "منتج غير موجود أو محذوف ⚠️"}
+                                </h3>
+                                {prod && (
+                                  <span className="text-xs font-bold text-[#9952FF] bg-[#9952FF]/5 px-2.5 py-1 rounded-lg">
+                                    {(prod.finalPrice || prod.price).toLocaleString()} د.ع
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* stats */}
+                              <div className="flex items-center gap-4 text-slate-500 text-xs font-semibold my-2">
+                                <div className="flex items-center gap-1">
+                                  <Eye size={14} className="text-slate-400" />
+                                  <span>{(reel.viewsCount || 0).toLocaleString()}</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <Heart size={14} className="text-rose-500" />
+                                  <span>{(reel.likesCount || 0).toLocaleString()}</span>
+                                </div>
+                              </div>
+
+                              {/* Buttons */}
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => handleStartEditReel(reel)}
+                                  className="flex-1 py-2 bg-slate-50 hover:bg-[#9952FF]/5 hover:text-[#9952FF] text-slate-600 font-bold text-xs rounded-xl border border-slate-100 transition flex items-center justify-center gap-1.5"
+                                >
+                                  <Edit size={14} />
+                                  <span>تعديل</span>
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteReel(reel.id)}
+                                  className="py-2 px-3 bg-rose-50 hover:bg-rose-500 hover:text-white text-rose-600 font-bold text-xs rounded-xl border border-rose-100 transition flex items-center justify-center"
+                                  title="حذف"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="animate-fade-in">
+                  <UploadReel
+                    reelToEdit={editingReel}
+                    onSuccess={() => {
+                      setReelsTabMode("list");
+                      fetchMerchantReels();
+                    }}
+                    onCancel={() => {
+                      setReelsTabMode("list");
+                    }}
+                  />
+                </div>
+              )}
             </div>
           )}
 
@@ -1767,58 +2489,7 @@ https://mahallak.app/store/${data.id}`
                           />
                         </div>
 
-                        {/* 4. تحديد الكل يقع تحت شريط البحث */}
-                        {filteredProductsForView.length > 0 && (
-                          <div className="flex justify-start">
-                            <button
-                              onClick={() =>
-                                handleSelectAllProducts(
-                                  filteredProductsForView,
-                                )
-                              }
-                              className="px-4 py-2 bg-white text-slate-700 border border-slate-200/80 text-xs font-black rounded-xl hover:bg-slate-50 hover:text-violet-650 hover:border-slate-200 transition-all shadow-sm active:scale-95 flex items-center gap-2"
-                            >
-                              <span className={`w-4 h-4 rounded border border-slate-300 flex items-center justify-center text-white transition-colors duration-200 ${
-                                selectedProductIds.length === filteredProductsForView.length ? 'bg-[#9952FF] border-[#9952FF]' : 'bg-white'
-                              }`}>
-                                {selectedProductIds.length === filteredProductsForView.length && <Check size={11} strokeWidth={3} />}
-                              </span>
-                              {selectedProductIds.length === filteredProductsForView.length
-                                ? "إلغاء تحديد الكل"
-                                : "تحديد الكل"}
-                            </button>
-                          </div>
-                        )}
-
-                        {/* شريط الإجراءات الجماعية للمنتجات المحددة */}
-                        {selectedProductIds.length > 0 && (
-                          <div className="fixed bottom-24 left-4 right-4 md:right-72 bg-white/95 backdrop-blur-md border-2 border-slate-200 p-4 rounded-2xl shadow-2xl z-40 flex items-center justify-between animate-bounce-in">
-                            <div className="flex items-center gap-3">
-                              <div className="bg-slate-100 text-slate-700 p-2.5 rounded-xl">
-                                <Zap size={20} className="className animate-pulse" />
-                              </div>
-                              <div>
-                                <span className="text-xs font-black text-slate-850 block">
-                                  تم تحديد {selectedProductIds.length} منتج
-                                </span>
-                                <button
-                                  onClick={() => setSelectedProductIds([])}
-                                  className="text-[10px] font-bold text-red-500 hover:underline"
-                                >
-                                  إلغاء التحديد الدولي
-                                </button>
-                              </div>
-                            </div>
-                            <button
-                              onClick={() => setShowBulkEditModal(true)}
-                              className="px-5 py-2 bg-gradient-to-l from-[#4D2980] to-[#4D2980] text-white font-black rounded-xl text-xs shadow-lg shadow-slate-100 active:scale-95 transition-all"
-                            >
-                              تعديل جماعي للمختار
-                            </button>
-                          </div>
-                        )}
-
-                        {/* 4. ترتيب المنتجات في شبكة GridView متناسقة وسهلة التصفح */}
+                                  {/* 4. ترتيب المنتجات في شبكة GridView متناسقة وسهلة التصفح */}
                         {filteredProductsForView.length === 0 ? (
                           <div className="bg-white p-12 rounded-2xl border border-dashed border-slate-200 text-center flex flex-col items-center justify-center">
                             <div className="p-4 bg-slate-50 text-slate-400 rounded-full mb-3">
@@ -1832,271 +2503,303 @@ https://mahallak.app/store/${data.id}`
                             </p>
                           </div>
                         ) : (
-                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 gap-4 pb-20">
-                            {filteredProductsForView.map((p) => {
-                              const isSelected = selectedProductIds.includes(p.id);
-                              return (
-                                <div
-                                  key={p.id}
-                                  className={`relative bg-white rounded-2xl border flex flex-col group transition-all duration-300 hover:shadow-md ${
-                                    isSelected
-                                      ? "border-slate-500 ring-2 ring-slate-100"
-                                      : "border-slate-100 hover:border-slate-300"
-                                  }`}
-                                >
-                                  {/* مربع تحديد المنتج */}
-                                  <button
-                                    onClick={() => toggleSelectProduct(p.id)}
-                                    className={`absolute top-2.5 right-2.5 z-20 w-5.5 h-5.5 rounded-lg border-2 flex items-center justify-center transition-all ${
-                                      isSelected
-                                        ? "bg-violet-650 border-slate-650 shadow-md"
-                                        : "bg-white/90 backdrop-blur-xs border-slate-300 opacity-0 group-hover:opacity-100"
-                                    }`}
-                                  >
-                                    {isSelected && (
-                                      <Check size={12} className="text-white" />
-                                    )}
-                                  </button>
-
-                                  {/* زر خيارات الـ "ثلاث نقاط" (PopupMenuButton) في الزاوية العلوية اليسرى */}
-                                  <div className="absolute top-2.5 left-2.5 z-30">
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setActiveMenuProductId(activeMenuProductId === p.id ? null : p.id);
-                                      }}
-                                      className="p-1.5 bg-white/95 backdrop-blur-xs rounded-xl text-slate-700 shadow-md hover:bg-slate-50 hover:text-violet-650 transition-all border border-slate-100/80 active:scale-95"
-                                      title="خيارات المنتج"
-                                    >
-                                      <MoreVertical size={14} className="font-bold" />
-                                    </button>
-
-                                    {/* القائمة الـ PopupMenuDropdown المنسدلة */}
-                                    <AnimatePresence>
-                                      {activeMenuProductId === p.id && (
-                                        <>
-                                          {/* خلفية تمنع النقر بالخارج وتغلق القائمة */}
-                                          <div
-                                            className="fixed inset-0 z-40"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              setActiveMenuProductId(null);
-                                            }}
-                                          />
-                                          
-                                          <motion.div
-                                            initial={{ opacity: 0, scale: 0.95, y: -5 }}
-                                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                                            exit={{ opacity: 0, scale: 0.95, y: -5 }}
-                                            transition={{ duration: 0.15 }}
-                                            className="absolute left-0 mt-1.5 w-48 bg-white border border-slate-100 rounded-2xl shadow-2xl z-50 overflow-hidden text-right"
-                                            onClick={(e) => e.stopPropagation()}
-                                          >
-                                            <div className="p-1.5 flex flex-col gap-1">
-                                              <button
-                                                onClick={() => {
-                                                  setActiveMenuProductId(null);
-                                                  setProdModal({
-                                                    show: true,
-                                                    mode: "edit",
-                                                    product: p,
-                                                  });
-                                                  setProdName(p.name);
-                                                   setProdDesc(p.description || "");
-                                                   setProdPrice(p.price);
-                                                   setProdCostPrice(p.costPrice || 0);
-                                                   setProdInventory(p.inventory !== undefined && p.inventory !== null ? p.inventory : "");
-                                                   setProdDiscountType(p.discountType);
-                                                   setProdDiscountValue(p.discountValue);
-                                                   setProdImage(p.image);
-                                                   setProdIsFreeDelivery(p.isFreeDelivery);
-                                                   setProdStatus(p.status);
-                                                   setProdSpecialOffer(p.specialOffer || "");
-                                                   setProdTags(p.tags || []);
-                                                   setProdBarcode(p.barcode || "");
-                                                   setProdColor(p.color || "");
-                                                   setProdSize(p.size || "");
-                                                   setProdLength(p.length || "");
-                                                   setProdWidth(p.width || "");
-                                                   setProdWeight(p.weight || "");
-                                                   setProdCondition(p.condition || "");
-                                                   setProdWarranty(p.warranty || "");
-                                                   setProdBrand(p.brand || "");
-                                                   setShowExtraInfo(!!(p.color || p.size || p.length || p.width || p.weight || p.condition || p.warranty || p.brand));
-                                                }}
-                                                className="w-full px-3 py-2 text-xs font-black text-slate-700 hover:bg-slate-50 hover:text-[#9952FF] rounded-xl flex items-center justify-start gap-2.5 transition"
-                                              >
-                                                <Edit size={14} className="text-slate-600" />
-                                                <span>تعديل المنتج</span>
-                                              </button>
-
-                                              <button
-                                                onClick={() => {
-                                                  setActiveMenuProductId(null);
-                                                  openShareModal("product", p);
-                                                }}
-                                                className="w-full px-3 py-2 text-xs font-black text-slate-700 hover:bg-emerald-50 hover:text-emerald-600 rounded-xl flex items-center justify-start gap-2.5 transition"
-                                              >
-                                                <Share2 size={14} className="text-emerald-500" />
-                                                <span>مشاركة الرابط</span>
-                                              </button>
-
-                                              {p.status !== "published" && (
-                                                <button
-                                                  onClick={() => {
-                                                    setActiveMenuProductId(null);
-                                                    handlePublishProduct(p.id);
-                                                  }}
-                                                  className="w-full px-3 py-2 text-xs font-black text-slate-700 hover:bg-[#f5eeff] hover:text-[#9952FF] rounded-xl flex items-center justify-start gap-2.5 transition"
-                                                >
-                                                  <Globe size={14} className="text-[#9952FF]" />
-                                                  <span>نشر على المتجر</span>
-                                                </button>
-                                              )}
-
-                                              {p.status !== "draft" && (
-                                                <button
-                                                  onClick={() => {
-                                                    setActiveMenuProductId(null);
-                                                    handleDraftProduct(p.id);
-                                                  }}
-                                                  className="w-full px-3 py-2 text-xs font-black text-slate-700 hover:bg-amber-50 hover:text-amber-600 rounded-xl flex items-center justify-start gap-2.5 transition"
-                                                >
-                                                  <FileText size={14} className="text-amber-500" />
-                                                  <span>نقل للمسودة</span>
-                                                </button>
-                                              )}
-
-                                              {p.status !== "archived" && (
-                                                <button
-                                                  onClick={() => {
-                                                    setActiveMenuProductId(null);
-                                                    handleArchiveProduct(p.id);
-                                                  }}
-                                                  className="w-full px-3 py-2 text-xs font-black text-slate-700 hover:bg-slate-100 hover:text-[#9952FF] rounded-xl flex items-center justify-start gap-2.5 transition"
-                                                >
-                                                  <Archive size={14} className="text-slate-500" />
-                                                  <span>نقل للأرشيف</span>
-                                                </button>
-                                              )}
-
-                                              <div className="h-[1px] bg-slate-100 my-0.5" />
-
-                                              <button
-                                                onClick={() => {
-                                                  setActiveMenuProductId(null);
-                                                  handleDeleteProduct(p.id, p.name);
-                                                }}
-                                                className="w-full px-3 py-1.5 text-xs font-black text-red-650 hover:bg-red-50 rounded-xl flex items-center justify-start gap-2.5 transition"
-                                              >
-                                                <Trash2 size={14} className="text-red-500" />
-                                                <span>حذف نهائي</span>
-                                              </button>
-                                            </div>
-                                          </motion.div>
-                                        </>
-                                      )}
-                                    </AnimatePresence>
+                          <div className="space-y-10 pb-20 text-right font-tajawal" dir="rtl">
+                            {(() => {
+                              const grouped: { name: string; products: Product[] }[] = [];
+                              const assignedIds = new Set<string>();
+                              
+                              // We use availableTags to group products
+                              availableTags.forEach((tag) => {
+                                const groupProducts = filteredProductsForView.filter((p) => {
+                                  if (p.tags && p.tags.includes(tag)) {
+                                    assignedIds.add(p.id);
+                                    return true;
+                                  }
+                                  return false;
+                                });
+                                if (groupProducts.length > 0) {
+                                  grouped.push({ name: tag, products: groupProducts });
+                                }
+                              });
+                              
+                              // Uncategorized products
+                              const uncategorized = filteredProductsForView.filter((p) => !assignedIds.has(p.id));
+                              if (uncategorized.length > 0) {
+                                grouped.push({ name: "منتجات أخرى فرعية أو غير مصنفة", products: uncategorized });
+                              }
+                              
+                              return grouped.map((group) => (
+                                <div key={group.name} className="space-y-4">
+                                  {/* عنوان قسم تصنيف نوع المنتج بلمسة بنفسجية مذهلة */}
+                                  <div className="flex items-center gap-2.5 bg-[#4D2980]/5 px-4 py-2.5 rounded-2xl border border-[#4D2980]/10 shrink-0 w-fit">
+                                    <div className="w-1.5 h-5 bg-gradient-to-b from-[#9952FF] to-[#4D2980] rounded-full" />
+                                    <h3 className="font-black text-[#4D2980] text-xs sm:text-sm">
+                                      {group.name}
+                                    </h3>
+                                    <span className="bg-white text-[#9952FF] text-[10px] font-black px-2 py-0.5 rounded-lg border border-purple-100/50">
+                                      {group.products.length} {group.products.length > 10 ? 'منتج' : 'منتجات'}
+                                    </span>
                                   </div>
 
-                                  {/* صورة المنتج - شكل مربع مثالي متجاوب */}
-                                  <div
-                                    className="aspect-square relative w-full overflow-hidden rounded-t-2xl bg-slate-55 pointer-events-auto cursor-pointer"
-                                    onClick={() => toggleSelectProduct(p.id)}
-                                  >
-                                    <img
-                                      src={p.image || undefined}
-                                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                                      referrerPolicy="no-referrer"
-                                      alt={p.name}
-                                    />
-                                    
-                                    {/* شارة نسبة الخصم باللون الذهبي الباذخ */}
-                                    {p.discountType !== "none" && (
-                                      <div className="absolute bottom-2.5 right-2.5 bg-gradient-to-l from-amber-500 to-yellow-500 text-[#4D2980] text-[9px] font-black px-2 py-0.5 rounded-full shadow-sm">
-                                        خصم %{p.discountValue}
-                                      </div>
-                                    )}
-
-                                    {/* شارة حالة النشر في زاوية الصورة */}
-                                    <div className="absolute bottom-2.5 left-2.5">
-                                      <span className={`px-2 py-0.5 rounded-full text-[8px] font-black shadow-xs ${
-                                        p.status === "published"
-                                          ? "bg-emerald-500/90 text-white"
-                                          : p.status === "draft"
-                                            ? "bg-amber-500/90 text-white"
-                                            : "bg-slate-550/90 text-white"
-                                      }`}>
-                                        {p.status === "published"
-                                          ? "منشور"
-                                          : p.status === "draft"
-                                            ? "مسودة"
-                                            : "مؤرشف"}
-                                      </span>
-                                    </div>
-                                  </div>
-
-                                  {/* تفاصيل البطاقة: الصورة، الاسم والسعر مع زر الـ Popup */}
-                                  <div
-                                    className="p-3 sm:p-4 flex-1 flex flex-col justify-between cursor-pointer"
-                                    onClick={() => toggleSelectProduct(p.id)}
-                                  >
-                                    <div>
-                                      {/* اسم المنتج */}
-                                      <h3
-                                        className="font-black text-[#4D2980] text-[11px] sm:text-xs leading-tight line-clamp-2 min-h-[2rem] hover:text-violet-650 transition-colors"
-                                        title={p.name}
-                                      >
-                                        {p.name}
-                                      </h3>
-
-                                      {/* مؤشر حالة المخزون بأسلوب نظيف */}
-                                      <div className="flex items-center gap-1.5 mt-2">
+                                  {/* شبكة المنتجات - تحتوي على 4 منتجات في السطر للأحجام المتوسطة والكبيرة */}
+                                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-4 gap-4">
+                                    {group.products.map((p) => {
+                                      const isSelected = selectedProductIds.includes(p.id);
+                                      return (
                                         <div
-                                          className={`w-2 h-2 rounded-full ${
-                                            (p.inventory || 0) > 10
-                                              ? "bg-emerald-400"
-                                              : (p.inventory || 0) > 0
-                                                ? "bg-amber-400"
-                                                : "bg-red-400 animate-pulse"
+                                          key={p.id}
+                                          className={`relative bg-white rounded-2xl border flex flex-col group transition-all duration-300 hover:shadow-md ${
+                                            isSelected
+                                              ? "border-slate-500 ring-2 ring-slate-100"
+                                              : "border-slate-100 hover:border-slate-300"
                                           }`}
-                                        ></div>
-                                        <span className="text-[10px] font-bold text-slate-400">
-                                          المتوفر: {p.inventory || 0}
-                                        </span>
-                                      </div>
-                                    </div>
+                                        >
+                                          {/* مربع تحديد المنتج */}
+                                          <button
+                                            onClick={() => toggleSelectProduct(p.id)}
+                                            className={`absolute top-2.5 right-2.5 z-20 w-5.5 h-5.5 rounded-lg border-2 flex items-center justify-center transition-all ${
+                                              isSelected
+                                                ? "bg-violet-650 border-slate-650 shadow-md"
+                                                : "bg-white/90 backdrop-blur-xs border-slate-300 opacity-0 group-hover:opacity-100"
+                                            }`}
+                                          >
+                                            {isSelected && (
+                                              <Check size={12} className="text-white" />
+                                            )}
+                                          </button>
 
-                                    {/* السعر مع تفاصيل الخصم وتوصيل مجاني بنبرة ألوان ذهبية/بنفسجية راقية */}
-                                    <div className="mt-2.5 pt-2.5 border-t border-slate-50 flex justify-between items-end">
-                                      <div className="flex flex-col">
-                                        <span className="text-xs sm:text-sm font-black text-violet-750 tracking-tight flex items-baseline gap-0.5">
-                                          {(p.finalPrice || 0).toLocaleString()}
-                                          <span className="text-[8px] font-bold text-slate-600">
-                                            د.ع
-                                          </span>
-                                        </span>
-                                        {p.discountType !== "none" && (
-                                          <span className="text-[9px] text-slate-400 font-bold line-through">
-                                            {(p.price || 0).toLocaleString()}
-                                          </span>
-                                        )}
-                                      </div>
-                                      
-                                      {p.isFreeDelivery && (
-                                        <div className="flex items-center gap-1.5 bg-amber-50 rounded-lg px-1.5 py-0.5 border border-amber-200/50">
-                                          <Truck
-                                            size={10}
-                                            className="text-amber-600 shrink-0 mb-0.5"
-                                          />
-                                          <span className="text-[8px] font-black text-amber-700">مجاني</span>
+                                          {/* زر خيارات الـ "ثلاث نقاط" (PopupMenuButton) في الزاوية العلوية اليسرى */}
+                                          <div className="absolute top-2.5 left-2.5 z-30 product-menu-container">
+                                            <button
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                setActiveMenuProductId(activeMenuProductId === p.id ? null : p.id);
+                                              }}
+                                              className="p-1.5 bg-white/95 backdrop-blur-xs rounded-xl text-slate-700 shadow-md hover:bg-slate-50 hover:text-[#9952FF] transition-all border border-slate-100/80 active:scale-95"
+                                              title="خيارات المنتج"
+                                            >
+                                              <MoreVertical size={14} className="font-bold" />
+                                            </button>
+
+                                            {/* القائمة الـ PopupMenuDropdown المنسدلة */}
+                                            <AnimatePresence>
+                                              {activeMenuProductId === p.id && (
+                                                <motion.div
+                                                  initial={{ opacity: 0, scale: 0.95, y: -5 }}
+                                                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                                                  exit={{ opacity: 0, scale: 0.95, y: -5 }}
+                                                  transition={{ duration: 0.15 }}
+                                                  className="absolute left-0 mt-1.5 w-48 bg-white border border-slate-100 rounded-2xl shadow-2xl z-50 overflow-hidden text-right"
+                                                  onClick={(e) => e.stopPropagation()}
+                                                >
+                                                  <div className="p-1.5 flex flex-col gap-1">
+                                                    <button
+                                                      onClick={() => {
+                                                        setActiveMenuProductId(null);
+                                                        setProdModal({
+                                                          show: true,
+                                                          mode: "edit",
+                                                          product: p,
+                                                        });
+                                                        setProdName(p.name);
+                                                        setProdDesc(p.description || "");
+                                                        setProdPrice(p.price);
+                                                        setProdCostPrice(p.costPrice || 0);
+                                                        setProdInventory(p.inventory !== undefined && p.inventory !== null ? p.inventory : "");
+                                                        setProdDiscountType(p.discountType);
+                                                        setProdDiscountValue(p.discountValue);
+                                                        setProdImage(p.image);
+                                                        setProdIsFreeDelivery(p.isFreeDelivery);
+                                                        setProdStatus(p.status);
+                                                        setProdSpecialOffer(p.specialOffer || "");
+                                                        setProdTags(p.tags || []);
+                                                        setProdBarcode(p.barcode || "");
+                                                        setProdColor(p.color || "");
+                                                        setProdSize(p.size || "");
+                                                        setProdLength(p.length || "");
+                                                        setProdWidth(p.width || "");
+                                                        setProdWeight(p.weight || "");
+                                                        setProdCondition(p.condition || "");
+                                                        setProdWarranty(p.warranty || "");
+                                                        setProdBrand(p.brand || "");
+                                                        setShowExtraInfo(!!(p.color || p.size || p.length || p.width || p.weight || p.condition || p.warranty || p.brand));
+                                                      }}
+                                                      className="w-full px-3 py-2 text-xs font-black text-slate-700 hover:bg-slate-50 hover:text-[#9952FF] rounded-xl flex items-center justify-start gap-2.5 transition"
+                                                    >
+                                                      <Edit size={14} className="text-slate-600" />
+                                                      <span>تعديل المنتج</span>
+                                                    </button>
+
+                                                    <button
+                                                      onClick={() => {
+                                                        setActiveMenuProductId(null);
+                                                        openShareModal("product", p);
+                                                      }}
+                                                      className="w-full px-3 py-2 text-xs font-black text-slate-700 hover:bg-emerald-50 hover:text-emerald-600 rounded-xl flex items-center justify-start gap-2.5 transition"
+                                                    >
+                                                      <Share2 size={14} className="text-emerald-500" />
+                                                      <span>مشاركة الرابط</span>
+                                                    </button>
+
+                                                    {p.status !== "published" && (
+                                                      <button
+                                                        onClick={() => {
+                                                          setActiveMenuProductId(null);
+                                                          handlePublishProduct(p.id);
+                                                        }}
+                                                        className="w-full px-3 py-2 text-xs font-black text-slate-700 hover:bg-[#f5eeff] hover:text-[#9952FF] rounded-xl flex items-center justify-start gap-2.5 transition"
+                                                      >
+                                                        <Globe size={14} className="text-[#9952FF]" />
+                                                        <span>نشر على المتجر</span>
+                                                      </button>
+                                                    )}
+
+                                                    {p.status !== "draft" && (
+                                                      <button
+                                                        onClick={() => {
+                                                          setActiveMenuProductId(null);
+                                                          handleDraftProduct(p.id);
+                                                        }}
+                                                        className="w-full px-3 py-2 text-xs font-black text-slate-700 hover:bg-amber-50 hover:text-amber-600 rounded-xl flex items-center justify-start gap-2.5 transition"
+                                                      >
+                                                        <FileText size={14} className="text-amber-500" />
+                                                        <span>نقل للمسودة</span>
+                                                      </button>
+                                                    )}
+
+                                                    {p.status !== "archived" && (
+                                                      <button
+                                                        onClick={() => {
+                                                          setActiveMenuProductId(null);
+                                                          handleArchiveProduct(p.id);
+                                                        }}
+                                                        className="w-full px-3 py-2 text-xs font-black text-slate-700 hover:bg-slate-100 hover:text-[#9952FF] rounded-xl flex items-center justify-start gap-2.5 transition"
+                                                      >
+                                                        <Archive size={14} className="text-slate-500" />
+                                                        <span>نقل للأرشيف</span>
+                                                      </button>
+                                                    )}
+
+                                                    <div className="h-[1px] bg-slate-100 my-0.5" />
+
+                                                    <button
+                                                      onClick={() => {
+                                                        setActiveMenuProductId(null);
+                                                        handleDeleteProduct(p.id, p.name);
+                                                      }}
+                                                      className="w-full px-3 py-1.5 text-xs font-black text-red-650 hover:bg-red-50 rounded-xl flex items-center justify-start gap-2.5 transition"
+                                                    >
+                                                      <Trash2 size={14} className="text-red-500" />
+                                                      <span>حذف نهائي</span>
+                                                    </button>
+                                                  </div>
+                                                </motion.div>
+                                              )}
+                                            </AnimatePresence>
+                                          </div>
+
+                                          {/* صورة المنتج - شكل مربع مثالي متجاوب */}
+                                          <div
+                                            className="aspect-square relative w-full overflow-hidden rounded-t-2xl bg-slate-55 pointer-events-auto cursor-pointer"
+                                            onClick={() => toggleSelectProduct(p.id)}
+                                          >
+                                            <img
+                                              src={p.image || undefined}
+                                              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                                              referrerPolicy="no-referrer"
+                                              alt={p.name}
+                                            />
+                                            
+                                            {/* شارة نسبة الخصم باللون الذهبي الباذخ */}
+                                            {p.discountType !== "none" && (
+                                              <div className="absolute bottom-2.5 right-2.5 bg-gradient-to-l from-amber-500 to-yellow-500 text-[#4D2980] text-[9px] font-black px-2 py-0.5 rounded-full shadow-sm">
+                                                خصم %{p.discountValue}
+                                              </div>
+                                            )}
+
+                                            {/* شارة حالة النشر في زاوية الصورة */}
+                                            <div className="absolute bottom-2.5 left-2.5">
+                                              <span className={`px-2 py-0.5 rounded-full text-[8px] font-black shadow-xs ${
+                                                p.status === "published"
+                                                  ? "bg-emerald-500/90 text-white"
+                                                  : p.status === "draft"
+                                                    ? "bg-amber-500/90 text-white"
+                                                    : "bg-slate-550/90 text-white"
+                                              }`}>
+                                                {p.status === "published"
+                                                  ? "منشور"
+                                                  : p.status === "draft"
+                                                    ? "مسودة"
+                                                    : "مؤرشف"}
+                                              </span>
+                                            </div>
+                                          </div>
+
+                                          {/* تفاصيل البطاقة: الصورة، الاسم والسعر مع زر الـ Popup */}
+                                          <div
+                                            className="p-3 sm:p-4 flex-1 flex flex-col justify-between cursor-pointer"
+                                            onClick={() => toggleSelectProduct(p.id)}
+                                          >
+                                            <div>
+                                              {/* اسم المنتج */}
+                                              <h3
+                                                className="font-black text-[#4D2980] text-[11px] sm:text-xs leading-tight line-clamp-2 min-h-[2rem] hover:text-[#9952FF] transition-colors"
+                                                title={p.name}
+                                              >
+                                                {p.name}
+                                              </h3>
+
+                                              {/* مؤشر حالة المخزون بأسلوب نظيف */}
+                                              <div className="flex items-center gap-1.5 mt-2">
+                                                <div
+                                                  className={`w-2 h-2 rounded-full ${
+                                                    (p.inventory || 0) > 10
+                                                      ? "bg-emerald-400"
+                                                      : (p.inventory || 0) > 0
+                                                        ? "bg-amber-400"
+                                                        : "bg-red-400 animate-pulse"
+                                                  }`}
+                                                ></div>
+                                                <span className="text-[10px] font-bold text-slate-400">
+                                                  المتوفر: {p.inventory || 0}
+                                                </span>
+                                              </div>
+                                            </div>
+
+                                            {/* السعر مع تفاصيل الخصم وتوصيل مجاني بنبرة ألوان ذهبية/بنفسجية راقية */}
+                                            <div className="mt-2.5 pt-2.5 border-t border-slate-50 flex justify-between items-end">
+                                              <div className="flex flex-col">
+                                                <span className="text-xs sm:text-sm font-black text-violet-750 tracking-tight flex items-baseline gap-0.5">
+                                                  {(p.finalPrice || 0).toLocaleString()}
+                                                  <span className="text-[8px] font-bold text-slate-600">
+                                                    د.ع
+                                                  </span>
+                                                </span>
+                                                {p.discountType !== "none" && (
+                                                  <span className="text-[9px] text-slate-400 font-bold line-through">
+                                                    {(p.price || 0).toLocaleString()}
+                                                  </span>
+                                                )}
+                                              </div>
+                                              
+                                              {p.isFreeDelivery && (
+                                                <div className="flex items-center gap-1.5 bg-amber-50 rounded-lg px-1.5 py-0.5 border border-amber-200/50">
+                                                  <Truck
+                                                    size={10}
+                                                    className="text-amber-600 shrink-0 mb-0.5"
+                                                  />
+                                                  <span className="text-[8px] font-black text-amber-700">مجاني</span>
+                                                </div>
+                                              )}
+                                            </div>
+                                          </div>
                                         </div>
-                                      )}
-                                    </div>
+                                      );
+                                    })}
                                   </div>
                                 </div>
-                              );
-                            })}
+                              ));
+                            })()}
                           </div>
                         )}
                       </>
@@ -2108,8 +2811,23 @@ https://mahallak.app/store/${data.id}`
           )}
 
           {/* الطلبات */}
-          {activeTab === "orders" && (
-            <div className="space-y-4 sm:space-y-6 min-w-0 w-full">
+          {activeTab === "orders" && (() => {
+            const displayOrdersList = (targetOrderId 
+              ? merchantOrders.filter(o => o.id === targetOrderId)
+              : merchantOrders.filter(
+                  (o) =>
+                    o.status === orderFilter ||
+                    (orderFilter === "returned" && o.status === "replaced") ||
+                    (orderFilter === "rejected" && o.status === "cancelled"),
+                )
+            ).sort((a, b) => {
+              const seqA = parseInt(getOrderSeqId(a.id)) || 999999;
+              const seqB = parseInt(getOrderSeqId(b.id)) || 999999;
+              return seqA - seqB; // تصاعدياً من رقم 1 كما هو مطلوب
+            });
+
+            return (
+              <div className="space-y-4 sm:space-y-6 min-w-0 w-full">
               {/* تتبع الطلب المحدد من الإشعارات */}
               {targetOrderId && (
                 <div className="bg-slate-50 border border-slate-100 p-4 sm:p-5 rounded-2xl flex flex-col sm:flex-row gap-3 items-center justify-between text-right shadow-2xs min-w-0">
@@ -2164,8 +2882,8 @@ https://mahallak.app/store/${data.id}`
                   },
                   {
                     id: "rejected",
-                    label: "مرفوض",
-                    count: merchantOrders.filter((o) => o.status === "rejected")
+                    label: "مرفوض / ملغي",
+                    count: merchantOrders.filter((o) => o.status === "rejected" || o.status === "cancelled")
                       .length,
                   },
                 ].map((f) => (
@@ -2186,14 +2904,7 @@ https://mahallak.app/store/${data.id}`
                 ))}
               </div>
 
-              {(targetOrderId 
-                ? merchantOrders.filter(o => o.id === targetOrderId)
-                : merchantOrders.filter(
-                    (o) =>
-                      o.status === orderFilter ||
-                      (orderFilter === "returned" && o.status === "replaced"),
-                  )
-              ).length === 0 ? (
+              {displayOrdersList.length === 0 ? (
                 <div className="py-20 text-center text-slate-300 bg-white rounded-[3rem] border border-dashed border-slate-200">
                   <ClipboardList
                     size={48}
@@ -2203,14 +2914,7 @@ https://mahallak.app/store/${data.id}`
                 </div>
               ) : (
                 <div className="flex flex-col gap-4 w-full">
-                  {(targetOrderId 
-                    ? merchantOrders.filter(o => o.id === targetOrderId)
-                    : merchantOrders.filter(
-                        (o) =>
-                          o.status === orderFilter ||
-                          (orderFilter === "returned" && o.status === "replaced"),
-                      )
-                  ).map((o) => (
+                  {displayOrdersList.map((o) => (
                       <div
                         key={o.id}
                         className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden flex flex-col transition-all hover:shadow-md min-w-0 w-full"
@@ -2219,24 +2923,31 @@ https://mahallak.app/store/${data.id}`
                         <div className="p-3 sm:p-4 border-b border-slate-50 bg-slate-50/50 flex flex-wrap justify-between items-center gap-3 min-w-0 w-full">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center flex-wrap gap-2 mb-1">
-                              <span className="text-[10px] bg-white text-slate-600 border border-slate-200 px-2 py-0.5 rounded-md font-black whitespace-nowrap shrink-0 drop-shadow-sm">
-                                #{o.id}
+                              <span className="text-[10px] bg-white text-slate-600 border border-slate-200 px-2 py-0.5 rounded-md font-black whitespace-nowrap shrink-0 drop-shadow-sm flex items-center gap-1">
+                                <span>#{getOrderSeqId(o.id)}</span>
+                                <CopyButton text={getOrderSeqId(o.id)} size={9} />
                               </span>
                               <span className="text-[9px] font-bold text-slate-400 whitespace-nowrap shrink-0">
-                                {new Date(o.createdAt).toLocaleDateString("ar-IQ")}
+                                {formatSafeDateTimeString(o.createdAt, 'ar-IQ', { dateStyle: 'short', timeStyle: 'short' })}
                               </span>
                             </div>
-                            <h3 className="text-sm font-black text-[#4D2980] truncate" title={o.customerName}>
-                              {o.customerName}
+                            <h3 className="text-sm font-black text-[#4D2980] flex items-center gap-1 truncate" title={o.customerName}>
+                              <span>{o.customerName}</span>
+                              <CopyButton text={o.customerName} size={10} />
                               {o.returnReason?.includes("استبدال") && (
                                 <span className="mr-2 inline-block text-[9px] bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded border border-amber-100 whitespace-nowrap shrink-0">
                                   استبدال 🔄
                                 </span>
                               )}
                             </h3>
-                            <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 mt-1 min-w-0">
+                            <span className="text-[10px] font-mono text-purple-600 inline-flex items-center gap-1 leading-none mt-1 select-all" title={o.customerId}>
+                              <span>ID: #{getCustomerSeqId(o.customerId)}</span>
+                              <CopyButton text={getCustomerSeqId(o.customerId)} size={9} />
+                            </span>
+                            <div className="flex items-center gap-1 text-[10px] font-bold text-slate-500 mt-1 min-w-0">
                               <Phone size={10} className="text-emerald-500 shrink-0" />
                               <span className="truncate">{o.customerPhone}</span>
+                              <CopyButton text={o.customerPhone} size={9} />
                             </div>
                           </div>
                           
@@ -2258,29 +2969,44 @@ https://mahallak.app/store/${data.id}`
                               <MapPin size={14} className="text-slate-400 mt-0.5 shrink-0" />
                               <div className="min-w-0 flex-1">
                                 <p className="text-[9px] font-black text-slate-400 mb-0.5">التوصيل</p>
-                                <p className="text-[10px] font-bold text-slate-700 truncate" title={`${o.customerProvince} - ${o.customerAddress}`}>
+                                <p className="text-[10px] font-bold text-slate-700 whitespace-normal break-words" title={`${o.customerProvince} - ${o.customerAddress}`}>
                                   {o.customerProvince} - {o.customerAddress}
                                 </p>
                                 {(o as any).customerLat && (o as any).customerLng && (
-                                  <div className="flex gap-2 mt-1.5">
-                                    <a 
-                                      href={`https://www.google.com/maps/search/?api=1&query=${(o as any).customerLat},${(o as any).customerLng}`}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="flex items-center gap-1 text-[8px] font-black bg-white border border-slate-200 text-slate-600 px-2 py-0.5 rounded shadow-sm hover:bg-slate-50 transition-colors"
-                                    >
-                                      <MapPin size={10} className="text-red-500" />
-                                      Maps
-                                    </a>
-                                    <a 
-                                      href={`https://waze.com/ul?ll=${(o as any).customerLat},${(o as any).customerLng}&navigate=yes`}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="flex items-center gap-1 text-[8px] font-black bg-[#f2fcfed9] border border-[#c2f2ff] text-[#00a9e0] px-2 py-0.5 rounded shadow-sm hover:bg-[#e6faff] transition-colors"
-                                    >
-                                      <Car size={10} />
-                                      Waze
-                                    </a>
+                                  <div className="mt-2 space-y-2">
+                                    <div className="w-full h-24 rounded-xl overflow-hidden border border-slate-200 shadow-sm relative pointer-events-none z-0">
+                                      <MapContainer 
+                                        center={[(o as any).customerLat, (o as any).customerLng]} 
+                                        zoom={14} 
+                                        style={{ height: "100%", width: "100%", zIndex: 0 }}
+                                        zoomControl={false}
+                                        attributionControl={false}
+                                        dragging={false}
+                                        scrollWheelZoom={false}
+                                        doubleClickZoom={false}
+                                      >
+                                        <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                                        <Marker position={[(o as any).customerLat, (o as any).customerLng]} />
+                                      </MapContainer>
+                                      {/* غطاء شفاف لمنع التفاعل مع الخريطة عبر اللمس */}
+                                      <div className="absolute inset-0 z-[400] bg-transparent"></div>
+                                    </div>
+                                    <div className="flex gap-2">
+                                      <button 
+                                        onClick={(e) => { e.preventDefault(); openNativeMapApp((o as any).customerLat, (o as any).customerLng, 'google'); }}
+                                        className="flex-1 flex items-center justify-center gap-1 text-[8px] font-black bg-white border border-slate-200 text-slate-600 px-2 py-2 rounded-lg shadow-sm hover:bg-slate-50 transition-colors"
+                                      >
+                                        <MapPin size={10} className="text-red-500" />
+                                        Maps
+                                      </button>
+                                      <button 
+                                        onClick={(e) => { e.preventDefault(); openNativeMapApp((o as any).customerLat, (o as any).customerLng, 'waze'); }}
+                                        className="flex-1 flex items-center justify-center gap-1 text-[8px] font-black bg-[#f2fcfed9] border border-[#c2f2ff] text-[#00a9e0] px-2 py-2 rounded-lg shadow-sm hover:bg-[#e6faff] transition-colors"
+                                      >
+                                        <Car size={10} />
+                                        Waze
+                                      </button>
+                                    </div>
                                   </div>
                                 )}
                               </div>
@@ -2293,10 +3019,13 @@ https://mahallak.app/store/${data.id}`
                             <div className="space-y-1.5 max-h-[100px] overflow-y-auto no-scrollbar pr-1">
                               {o.items.map((it, idx) => (
                                 <div key={idx} className="flex items-center justify-between gap-2 min-w-0">
-                                  <div className="flex items-center gap-1.5 min-w-0">
-                                    <span className="w-5 h-5 bg-slate-100 rounded text-[9px] font-black text-slate-600 flex items-center justify-center shrink-0">
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    {it.image && (
+                                      <img src={it.image} alt={it.productName} className="w-8 h-8 rounded-lg object-cover border border-slate-100 shrink-0 bg-slate-50" />
+                                    )}
+                                    <div className="flex items-center justify-center w-5 h-5 bg-slate-100 rounded text-[9px] font-black text-slate-600 shrink-0">
                                       {it.quantity}
-                                    </span>
+                                    </div>
                                     <span className="text-[10px] font-bold text-slate-700 truncate" title={it.productName}>
                                       {it.productName}
                                     </span>
@@ -2307,9 +3036,9 @@ https://mahallak.app/store/${data.id}`
                                 </div>
                               ))}
                             </div>
-                            {(o.rejectionReason || o.returnReason) && (
+                            {(o.rejectionReason || o.returnReason || o.status === "cancelled") && (
                               <div className="mt-3 p-2 bg-rose-50 rounded-lg border border-rose-100 text-[9px] font-bold text-rose-600 truncate">
-                                {o.rejectionReason ? `رفض: ${o.rejectionReason}` : `إرجاع/استبدال: ${o.returnReason}`}
+                                {o.status === "cancelled" ? "تم إلغاء الطلب تلقائياً من قبل الزبون خلال 30 ثانية ⚠️" : o.rejectionReason ? `رفض: ${o.rejectionReason}` : `إرجاع/استبدال: ${o.returnReason}`}
                               </div>
                             )}
                           </div>
@@ -2324,6 +3053,9 @@ https://mahallak.app/store/${data.id}`
                                 <button onClick={() => setActionModal({ show: true, orderId: o.id, type: "rejected" })} className="flex-1 py-2 bg-white text-rose-500 border border-slate-200 rounded-xl font-black text-[10px] flex items-center justify-center gap-1.5 hover:bg-rose-50 active:scale-95 transition-all w-full">
                                   <X size={14} /> رفض
                                 </button>
+                                <button onClick={() => { setSelectedInvoice(o); setShowInvoiceModal(true); }} className="flex-1 py-2 bg-white text-slate-600 border border-slate-200 rounded-xl font-black text-[10px] flex items-center justify-center gap-1.5 hover:bg-slate-50 active:scale-95 transition-all w-full">
+                                  <FileText size={14} /> فاتورة
+                                </button>
                               </>
                             )}
                             {o.status === "accepted" && (
@@ -2333,22 +3065,17 @@ https://mahallak.app/store/${data.id}`
                             )}
                             {o.status === "shipped" && (
                               <>
-                                <button onClick={() => updateOrderStatus(o.id, "delivered")} className="flex-[2] py-2 bg-emerald-500 text-white rounded-xl font-black text-[10px] flex items-center justify-center gap-1 hover:bg-emerald-600 active:scale-95 transition-all w-full">
-                                  <CheckCircle size={14} /> وصل
+                                <button onClick={() => updateOrderStatus(o.id, "delivered")} className="flex-1 py-2 bg-emerald-500 text-white rounded-xl font-black text-[10px] flex items-center justify-center gap-1 hover:bg-emerald-600 active:scale-95 transition-all w-full">
+                                  <CheckCircle size={14} /> تم التوصيل
                                 </button>
-                                <div className="flex gap-1.5 w-full">
-                                  <button onClick={() => setReplacementModal({ show: true, orderId: o.id, originalItems: o.items })} className="flex-1 py-2 bg-white text-slate-600 border border-slate-200 rounded-xl font-black text-[9px] hover:bg-slate-50 active:scale-95 w-full">
-                                    تبديل
-                                  </button>
-                                  <button onClick={() => handleReturnOrder(o.id)} className="flex-1 py-2 bg-white text-rose-500 border border-rose-200 rounded-xl font-black text-[9px] hover:bg-rose-50 active:scale-95 w-full">
-                                    إرجاع
-                                  </button>
-                                </div>
+                                <button onClick={() => setReplacementModal({ show: true, orderId: o.id, originalItems: o.items })} className="flex-1 py-2 bg-white text-slate-600 border border-slate-200 rounded-xl font-black text-[10px] hover:bg-slate-50 active:scale-95 transition-all w-full flex items-center justify-center">
+                                  تبديل
+                                </button>
+                                <button onClick={() => handleReturnOrder(o.id)} className="flex-1 py-2 bg-white text-rose-500 border border-rose-200 rounded-xl font-black text-[10px] hover:bg-rose-50 active:scale-95 transition-all w-full flex items-center justify-center">
+                                  إرجاع
+                                </button>
                               </>
                             )}
-                            <button onClick={() => { setSelectedInvoice(o); setShowInvoiceModal(true); }} className="flex-1 py-2 bg-white text-slate-600 border border-slate-200 rounded-xl font-black text-[10px] flex items-center justify-center gap-1.5 hover:bg-slate-50 active:scale-95 transition-all mt-auto w-full">
-                              <FileText size={14} /> فاتورة
-                            </button>
                           </div>
                         </div>
                       </div>
@@ -2356,81 +3083,10 @@ https://mahallak.app/store/${data.id}`
                 </div>
               )}
             </div>
-          )}
+            );
+          })()}
 
-          {/* الخصومات */}
-          {activeTab === "promo" && (
-            <div className="space-y-6">
-              <div className="bg-white p-6 rounded-2xl shadow-sm border flex justify-between items-center">
-                <div>
-                  <h2 className="text-lg font-bold">أكواد الخصم 🎫</h2>
-                </div>
-                <button
-                  onClick={() => setPromoModal(true)}
-                  className="px-4 py-2 bg-[#9952FF] text-white font-bold rounded-xl shadow-md flex items-center space-x-2 space-x-reverse"
-                >
-                  <Plus size={18} />
-                  <span>إنشاء كود</span>
-                </button>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {merchantPromos.map((p) => (
-                  <div
-                    key={p.id}
-                    className="bg-white p-5 rounded-2xl border shadow-sm"
-                  >
-                    <div className="flex justify-between items-center mb-3">
-                      <code className="bg-slate-50 text-slate-700 px-3 py-1.5 rounded-xl font-black tracking-wider">
-                        {p.code}
-                      </code>
-                      <span
-                        className={`px-2 py-0.5 text-[10px] font-bold rounded-full ${p.status === "active" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}
-                      >
-                        {p.status === "active" ? "فعال" : "منتهي"}
-                      </span>
-                    </div>
-                    <span className="text-lg font-black">
-                      {(p.discountValue || 0).toLocaleString()}{" "}
-                      {p.discountType === "percent" ? "%" : "د.ع"}
-                    </span>
-                    <div className="flex justify-between mt-3 text-xs text-slate-500">
-                      <p>
-                        استخدام: {p.usedCount}/{p.maxUses}
-                      </p>
-                      {p.maxUsesPerUser && <p>حصة الفرد: {p.maxUsesPerUser}</p>}
-                    </div>
-                    <p className="text-[10px] text-slate-400 mt-2 bg-slate-50 p-1.5 rounded-lg text-center">
-                      {p.startDate
-                        ? `${new Date(p.startDate).toLocaleDateString()} إلى `
-                        : ""}
-                      {p.expiresAt
-                        ? new Date(p.expiresAt).toLocaleDateString()
-                        : "مستمر"}
-                    </p>
-                    <div className="flex justify-between items-center mt-3 pt-3 border-t">
-                      <button
-                        onClick={() => togglePromoCodeStatus(p.id)}
-                        className={`text-xs font-bold px-3 py-1.5 rounded-xl transition ${
-                          p.status === "active"
-                            ? "bg-orange-50 text-orange-600 hover:bg-orange-100"
-                            : "bg-green-50 text-green-600 hover:bg-green-100"
-                        }`}
-                      >
-                        {p.status === "active" ? "إيقاف" : "تفعيل"}
-                      </button>
-                      <button
-                        onClick={() => deletePromoCode(p.id)}
-                        className="p-1.5 text-red-400 bg-red-50 hover:bg-red-500 hover:text-white rounded-xl transition"
-                        title="حذف الكود نهائياً"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+
 
           {/* زبائني */}
           {activeTab === "customers" && (
@@ -2506,7 +3162,7 @@ https://mahallak.app/store/${data.id}`
                     />
                   </div>
                 </div>
-                <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                <div className="p-4 flex flex-col gap-3.5">
                   {(() => {
                     const orderedCustomerIds = Array.from(
                       new Set(
@@ -2531,6 +3187,13 @@ https://mahallak.app/store/${data.id}`
                        );
                     }
 
+                    // ترتيب زبائن المتجر تصاعدياً حسب تسلسل تسجيلهم بالتطبيق من رقم 1 تصاعدياً
+                    audience.sort((a, b) => {
+                      const seqA = parseInt(getCustomerSeqId(a.id)) || 999999;
+                      const seqB = parseInt(getCustomerSeqId(b.id)) || 999999;
+                      return seqA - seqB;
+                    });
+
                     if (audience.length === 0) {
                       return (
                         <div className="col-span-full p-10 text-center text-slate-400 font-bold bg-white rounded-xl border border-slate-100">
@@ -2547,9 +3210,18 @@ https://mahallak.app/store/${data.id}`
                       >
                         <div className="flex justify-between items-start mb-3 min-w-0">
                           <div className="min-w-0 flex-1">
-                            <h4 className="font-black text-[#4D2980] text-sm truncate" title={c.name}>{c.name}</h4>
-                            <span className="text-[10px] font-bold text-slate-400 line-clamp-1 truncate mt-0.5" title={c.phone}>
-                              {c.phone} • {c.province}
+                            <h4 className="font-black text-[#4D2980] text-sm truncate flex items-center gap-1" title={c.name}>
+                              <span>{c.name}</span>
+                              <CopyButton text={c.name} size={10} />
+                            </h4>
+                            <span className="text-[10px] font-mono text-purple-600 inline-flex items-center gap-1 leading-none mt-1 select-all" title={c.id}>
+                              <span>ID: #{getCustomerSeqId(c.id)}</span>
+                              <CopyButton text={getCustomerSeqId(c.id)} size={9} />
+                            </span>
+                            <span className="text-[10px] font-bold text-slate-400 line-clamp-1 truncate mt-1 flex items-center gap-1" title={c.phone}>
+                              <span>{c.phone}</span>
+                              <CopyButton text={c.phone} size={9} />
+                              <span>• {c.province}</span>
                             </span>
                           </div>
                           <span
@@ -2684,186 +3356,6 @@ https://mahallak.app/store/${data.id}`
                   )}
                 </form>
               </motion.div>
-            </div>
-          )}
-
-          {/* الهوية الرقمية QR */}
-          {activeTab === "flashsales" && (
-            <div className="space-y-4">
-              <div className="bg-gradient-to-l from-yellow-50 to-white rounded-2xl border shadow-sm p-6 overflow-hidden relative">
-                <div className="absolute top-0 right-0 p-4 opacity-10">
-                  <Zap size={100} className="text-yellow-500" />
-                </div>
-                <div className="relative z-10 text-right">
-                  <h3 className="font-black text-2xl text-[#4D2980] flex items-center space-x-2 space-x-reverse mb-2">
-                    <Zap size={24} className="text-yellow-500" />
-                    <span>الفعاليات المركزية (Flash Sales)</span>
-                  </h3>
-                  <p className="text-xs text-slate-500 max-w-sm">
-                    شارك بمنتجاتك في الفعاليات المركزية وحقق مبيعات ضخمة خلال
-                    فترة قصيرة!
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 gap-4">
-                {flashSales.filter((s) => s.status !== "ended" && s.status !== "paused").length === 0 ? (
-                  <div className="bg-white p-12 rounded-2xl border shadow-sm text-center">
-                    <Gift size={48} className="mx-auto text-slate-200 mb-4" />
-                    <p className="font-bold text-slate-400">
-                      لا توجد فعاليات مركزية حالياً
-                    </p>
-                  </div>
-                ) : (
-                  flashSales
-                    .filter((s) => s.status !== "ended" && s.status !== "paused")
-                    .map((sale) => {
-                      const isUpcoming = new Date() < new Date(sale.startTime);
-                      const myRequests = flashSaleRequests.filter(
-                        (r) =>
-                          r.flashSaleId === sale.id &&
-                          r.storeId === currentMerchant.id,
-                      );
-                      return (
-                        <div
-                          key={sale.id}
-                          className="bg-white rounded-2xl border shadow-sm p-6"
-                        >
-                          <div className="flex justify-between items-start mb-4">
-                            <div>
-                              <h4 className="font-black text-lg text-[#4D2980]">
-                                {sale.title}
-                              </h4>
-                              <p className="text-xs text-slate-500 mt-1">
-                                {sale.description}
-                              </p>
-                            </div>
-                            {(sale.status === "upcoming" && isUpcoming) && (
-                              <span className="px-3 py-1 bg-amber-100 text-amber-700 text-[10px] font-bold rounded-full border border-amber-200">
-                                تبدأ قريباً
-                              </span>
-                            )}
-                            {(sale.status === "active" || (!isUpcoming)) && (
-                              <span className="px-3 py-1 bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded-full border border-emerald-200 flex items-center gap-1">
-                                <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-ping"></div>
-                                فعالية نشطة الآن
-                              </span>
-                            )}
-                          </div>
-
-                          <div className="flex gap-4 mb-6 text-[11px] font-bold text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-100">
-                            <div>
-                              يبدأ:{" "}
-                              <span
-                                className="font-mono text-[#4D2980]"
-                                dir="ltr"
-                              >
-                                {new Date(sale.startTime).toLocaleString(
-                                  "ar-IQ",
-                                )}
-                              </span>
-                            </div>
-                            <div>
-                              ينتهي:{" "}
-                              <span
-                                className="font-mono text-[#4D2980]"
-                                dir="ltr"
-                              >
-                                {new Date(sale.endTime).toLocaleString("ar-IQ")}
-                              </span>
-                            </div>
-                          </div>
-
-                          {sale.status === "active" &&
-                            myRequests.length === 0 && (
-                              <div className="bg-rose-50 text-rose-600 p-3 rounded-xl text-xs font-bold mb-4 border border-rose-100 text-center">
-                                لا يمكنك المشاركة لأن الفعالية قد بدأت بالفعل.
-                                يرجى التقديم في الفعاليات القادمة مسبقاً.
-                              </div>
-                            )}
-
-                          <div className="space-y-3">
-                            <h5 className="font-bold text-slate-700 text-xs flex justify-between items-center pb-2 border-b">
-                              <span>
-                                منتجاتك المشاركة ({myRequests.length})
-                              </span>
-                              {(sale.status === "upcoming" && isUpcoming) && (
-                                <button
-                                  onClick={() =>
-                                    setJoinFlashSaleData({
-                                      flashSaleId: sale.id,
-                                    })
-                                  }
-                                  className="px-3 py-1 bg-slate-50 text-[#4D2980] rounded-lg font-bold text-[10px] hover:bg-slate-100 transition"
-                                >
-                                  + طلب مشاركة لمنتج
-                                </button>
-                              )}
-                            </h5>
-
-                            {myRequests.length === 0 && (
-                              <div className="text-center text-slate-400 py-4 text-xs font-bold bg-slate-50 rounded-xl border border-dashed border-slate-200">
-                                لم يتم مشاركه لمنتج
-                              </div>
-                            )}
-
-                            {myRequests.map((req) => {
-                              const p = products.find(
-                                (prod) => prod.id === req.productId,
-                              );
-                              if (!p) return null;
-                              return (
-                                <div
-                                  key={req.id}
-                                  className="flex justify-between items-center p-3 bg-white border border-slate-100 rounded-2xl shadow-sm"
-                                >
-                                  <div className="flex items-center gap-3">
-                                    <img
-                                      src={p.image || undefined}
-                                      className="w-10 h-10 rounded-xl object-cover"
-                                    />
-                                    <div>
-                                      <h6 className="font-black text-[11px] text-[#4D2980]">
-                                        {p.name}
-                                      </h6>
-                                      <div className="flex gap-2 text-[9px] mt-0.5">
-                                        <span className="text-slate-400">
-                                          أصلي:{" "}
-                                          <del>{p.price.toLocaleString()}</del>
-                                        </span>
-                                        <span className="text-rose-600 font-black">
-                                          حالي:{" "}
-                                          {req.promotionalPrice.toLocaleString()}
-                                        </span>
-                                      </div>
-                                    </div>
-                                  </div>
-                                  <div>
-                                    {req.status === "pending" && (
-                                      <span className="px-2 py-1 bg-slate-100 text-slate-600 font-bold text-[9px] rounded uppercase">
-                                        قيد المراجعة
-                                      </span>
-                                    )}
-                                    {req.status === "approved" && (
-                                      <span className="px-2 py-1 bg-emerald-100 text-emerald-700 font-bold text-[9px] rounded uppercase">
-                                        مقبول
-                                      </span>
-                                    )}
-                                    {req.status === "rejected" && (
-                                      <span className="px-2 py-1 bg-rose-100 text-rose-700 font-bold text-[9px] rounded uppercase">
-                                        مرفوض
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      );
-                    })
-                )}
-              </div>
             </div>
           )}
 
@@ -3287,6 +3779,70 @@ https://mahallak.app/store/${data.id}`
           )}
         </AnimatePresence>
 
+        {/* Modal: تأكيد حظر/إلغاء حظر الزبون بأسلوب بنفسجي وسيليكون مذهل */}
+        <AnimatePresence>
+          {blockConfirm.show && (
+            <div className="fixed inset-0 bg-[#4D2980]/45 backdrop-blur-md z-[120] flex items-center justify-center p-4">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="bg-white rounded-[2.5rem] w-full max-w-sm overflow-hidden shadow-2xl relative text-right"
+                dir="rtl"
+              >
+                <div className="p-6">
+                  <div className={`w-16 h-16 ${blockConfirm.isBlocked ? 'bg-emerald-50 text-emerald-500' : 'bg-red-50 text-red-500'} rounded-full flex items-center justify-center mx-auto mb-4`}>
+                    <AlertTriangle size={32} />
+                  </div>
+                  <h3 className="text-xl font-black text-center text-[#4D2980] mb-2">
+                    {blockConfirm.isBlocked ? "إلغاء حظر الزبون" : "حظر الزبون"}
+                  </h3>
+                  <p className="text-center text-sm text-slate-600 mb-6 font-bold leading-relaxed font-sans">
+                    {blockConfirm.isBlocked 
+                      ? `هل تريد بالتأكيد إلغاء الحظر عن الزبون "${blockConfirm.name}"؟` 
+                      : `هل أنت متأكد من حظر الزبون "${blockConfirm.name}"؟`}
+                    <br />
+                    <span className="text-slate-400 text-xs font-normal block mt-1">
+                      {blockConfirm.isBlocked 
+                        ? "سيتمكن الزبون من رؤية متجرك وطلب منتجاتك مرة أخرى." 
+                        : "لن يتمكن الزبون من رؤية متجرك أو عمل طلبات جديدة."}
+                    </span>
+                  </p>
+
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          await updateCustomerProfile({ id: blockConfirm.customerId, isBlocked: !blockConfirm.isBlocked });
+                          alert(blockConfirm.isBlocked ? "تم إلغاء حظر الزبون بنجاح! ✅" : "تم حظر الزبون بنجاح! 🚫");
+                        } catch (err) {
+                          console.error("Error blocking:", err);
+                          alert("❌ حدث خطأ أثناء تعديل حالة الحظر");
+                        } finally {
+                          setBlockConfirm({ show: false, customerId: "", name: "", isBlocked: false });
+                        }
+                      }}
+                      className={`flex-1 py-3 ${blockConfirm.isBlocked ? 'bg-emerald-600 hover:bg-emerald-700 animate-pulse' : 'bg-red-600 hover:bg-red-700'} text-white font-black rounded-2xl shadow-lg transition`}
+                    >
+                      {blockConfirm.isBlocked ? "نعم، إلغاء الحظر" : "نعم، حظر الزبون"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setBlockConfirm({ show: false, customerId: "", name: "", isBlocked: false })
+                      }
+                      className="flex-1 py-3 bg-slate-100 text-slate-700 font-black rounded-2xl hover:bg-slate-200 transition"
+                    >
+                      إلغاء
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
         {/* Modal: إضافة/تعديل منتج */}
         {prodModal.show && (
           <div className="fixed inset-0 bg-[#4D2980]/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
@@ -3319,12 +3875,20 @@ https://mahallak.app/store/${data.id}`
                 {/* 1. صورة المنتج في المقدمة كما تطلب تجربة المستخدم UX */}
                 <div className="bg-slate-50/50 p-4 rounded-2xl border border-dashed border-slate-200 flex flex-col items-center justify-center gap-2">
                   <span className="text-xs font-black text-slate-500 mb-1">صورة المنتج الرئيسية *</span>
-                  <div className="w-full max-w-[200px] mx-auto bg-white rounded-2xl p-2 shadow-xs">
+                  <div className="w-full max-w-[200px] mx-auto bg-white rounded-2xl p-2 shadow-xs flex flex-col items-center">
                     <ImageUploader
                       value={prodImage}
                       onChange={setProdImage}
                       label="أضف صورة جذابة"
                     />
+                    <button
+                      type="button"
+                      onClick={() => setShowBgRemoverModal(true)}
+                      className="mt-2.5 py-2 px-3 bg-violet-50 hover:bg-violet-100 border border-violet-100 text-[#4D2980] hover:text-violet-900 text-[10px] font-black rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-xs w-full"
+                    >
+                      <Sparkles size={12} className="animate-pulse text-[#9952FF]" />
+                      <span>تفريغ ميزات الكاميرا مجاناً ✨</span>
+                    </button>
                   </div>
                   <p className="text-[9px] text-slate-400 font-bold text-center">
                     الصور ذات الخلفية البيضاء أو الواضحة تزيد المبيعات بنسبة 40%
@@ -3773,6 +4337,7 @@ https://mahallak.app/store/${data.id}`
                     ].map((s) => (
                       <button
                         key={s.id}
+                        type="button"
                         onClick={() =>
                           setBulkUpdateData((prev) => ({
                             ...prev,
@@ -3781,8 +4346,12 @@ https://mahallak.app/store/${data.id}`
                         }
                         className={`py-3 rounded-2xl text-[11px] font-bold border-2 transition-all ${
                           bulkUpdateData.status === s.id
-                            ? "border-[#9952FF] bg-slate-50 text-slate-700"
-                            : "border-transparent " + s.color
+                            ? s.id === "published"
+                              ? "border-emerald-500 bg-emerald-50 text-emerald-700 font-extrabold scale-105 shadow-sm"
+                              : s.id === "draft"
+                              ? "border-amber-500 bg-amber-50 text-amber-700 font-extrabold scale-105 shadow-sm"
+                              : "border-purple-500 bg-purple-50 text-[#9952FF] font-extrabold scale-105 shadow-sm"
+                            : "border-slate-250 bg-white text-slate-500 hover:bg-slate-50"
                         }`}
                       >
                         {s.label}
@@ -3793,14 +4362,16 @@ https://mahallak.app/store/${data.id}`
 
                 <div className="flex gap-4 pt-4">
                   <button
+                    type="button"
                     onClick={handleBulkUpdate}
-                    className="flex-1 py-4 bg-[#9952FF] text-white font-black rounded-2xl shadow-xl shadow-slate-100 hover:bg-[#9952FF] active:scale-95 transition-all"
+                    className="flex-1 py-4 bg-[#9952FF] text-white font-black rounded-2xl shadow-xl shadow-slate-100 hover:bg-slate-700 active:scale-95 transition-all cursor-pointer"
                   >
                     تحديث المنتجات المختارة
                   </button>
                   <button
+                    type="button"
                     onClick={() => setShowBulkEditModal(false)}
-                    className="px-8 py-4 bg-slate-100 text-slate-600 font-black rounded-2xl hover:bg-slate-200 transition-all"
+                    className="px-8 py-4 bg-slate-100 text-slate-600 font-black rounded-2xl hover:bg-slate-200 transition-all cursor-pointer"
                   >
                     إلغاء
                   </button>
@@ -3841,151 +4412,246 @@ https://mahallak.app/store/${data.id}`
         )}
 
         {/* Modal: إنشاء بروموكود */}
-        {promoModal && (
-          <div className="fixed inset-0 bg-[#4D2980]/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl animate-fade-in text-right max-h-[90vh] overflow-y-auto">
-              <div className="flex justify-between items-center mb-6 pb-2 border-b">
-                <h3 className="font-black text-[#4D2980]">إنشاء كود خصم</h3>
-                <button onClick={() => setPromoModal(false)}>
-                  <X size={18} className="text-slate-400" />
-                </button>
-              </div>
-              <form onSubmit={handleCreatePromo} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1">
-                    الكود
-                  </label>
-                  <input
-                    type="text"
-                    value={pCode}
-                    onChange={(e) => setPCode(e.target.value.toUpperCase())}
-                    required
-                    className="w-full border p-3 rounded-2xl font-mono text-center uppercase"
-                  />
-                </div>
+        <AnimatePresence>
+          {promoModal && (
+            <div className="fixed inset-0 bg-[#4D2980]/40 backdrop-blur-md z-[110] flex items-center justify-center p-4 overflow-y-auto" dir="rtl">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 15 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 15 }}
+                transition={{ duration: 0.25, ease: "easeOut" }}
+                className="bg-white rounded-[2.5rem] w-full max-w-md p-8 shadow-2xl text-right max-h-[90vh] overflow-y-auto relative border border-slate-100 no-scrollbar"
+              >
+                {/* Decoration elements to make it look like a high-end coupon ticket */}
+                <div className="absolute top-1/2 -left-3 w-6 h-6 bg-slate-50 border-r border-slate-100 rounded-full transform -translate-y-1/2 z-10 hidden sm:block"></div>
+                <div className="absolute top-1/2 -right-3 w-6 h-6 bg-slate-50 border-l border-slate-100 rounded-full transform -translate-y-1/2 z-10 hidden sm:block"></div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 mb-1">
-                      نوع الخصم
-                    </label>
-                    <select
-                      value={pDiscountType}
-                      onChange={(e) => setPDiscountType(e.target.value as any)}
-                      className="w-full border p-3 rounded-2xl bg-white text-sm"
-                    >
-                      <option value="amount">مبلغ ثابت</option>
-                      <option value="percent">نسبة مئوية (%)</option>
-                    </select>
+                {/* Header */}
+                <div className="flex justify-between items-start mb-6">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-purple-50 text-[#9952FF] rounded-2xl flex items-center justify-center border border-purple-100 shrink-0">
+                      <Ticket size={24} className="transform -rotate-12" />
+                    </div>
+                    <div>
+                      <h3 className="font-black text-lg text-slate-800 leading-tight">إنشاء كود خصم جديد</h3>
+                      <p className="text-[10px] font-medium text-slate-400 mt-0.5">صمم كوداً مميزاً لزيادة المبيعات والطلب</p>
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 mb-1">
-                      القيمة
-                    </label>
-                    <input
-                      type="number"
-                      value={pDiscount || ""}
-                      onChange={(e) =>
-                        setPDiscount(parseInt(e.target.value) || 0)
-                      }
-                      required
-                      className="w-full border p-3 rounded-2xl text-center text-sm"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 mb-1">
-                      إجمالي الاستخدام
-                    </label>
-                    <input
-                      type="number"
-                      value={pMaxUses || ""}
-                      onChange={(e) =>
-                        setPMaxUses(parseInt(e.target.value) || 0)
-                      }
-                      required
-                      className="w-full border p-3 rounded-2xl text-center text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 mb-1">
-                      للشخص الواحد
-                    </label>
-                    <input
-                      type="number"
-                      value={pMaxUsesPerUser || ""}
-                      onChange={(e) =>
-                        setPMaxUsesPerUser(parseInt(e.target.value) || 0)
-                      }
-                      required
-                      className="w-full border p-3 rounded-2xl text-center text-sm"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1">
-                    تحديد مدة الصلاحية
-                  </label>
-                  <select
-                    value={pExpiryType}
-                    onChange={(e) => setPExpiryType(e.target.value as any)}
-                    className="w-full border p-3 rounded-2xl bg-white mb-2 text-sm"
+                  <button 
+                    onClick={() => setPromoModal(false)}
+                    className="p-2 hover:bg-slate-100 rounded-full transition-colors cursor-pointer text-slate-400 hover:text-slate-600"
                   >
-                    <option value="days">بالأيام المتبقية</option>
-                    <option value="date">بتاريخ محدد</option>
-                  </select>
+                    <X size={18} />
+                  </button>
+                </div>
 
-                  {pExpiryType === "days" ? (
-                    <input
-                      type="number"
-                      placeholder="عدد الأيام"
-                      value={pExpiryDays || ""}
-                      onChange={(e) =>
-                        setPExpiryDays(parseInt(e.target.value) || 0)
-                      }
-                      className="w-full border p-3 rounded-2xl text-center text-sm"
-                    />
-                  ) : (
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="block text-[10px] text-slate-400 mb-1">
-                          البدء (اختياري)
-                        </label>
-                        <input
-                          type="date"
-                          value={pStartDate}
-                          onChange={(e) => setPStartDate(e.target.value)}
-                          className="w-full border p-2 rounded-xl text-center text-xs"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] text-slate-400 mb-1">
-                          الانتهاء
-                        </label>
-                        <input
-                          type="date"
-                          value={pEndDate}
-                          onChange={(e) => setPEndDate(e.target.value)}
-                          className="w-full border p-2 rounded-xl text-center text-xs"
-                        />
+                <form onSubmit={handleCreatePromo} className="space-y-5">
+                  {/* كود الخصم (The Code) */}
+                  <div className="bg-slate-50/50 p-4 rounded-3xl border border-dashed border-slate-200">
+                    <label className="block text-[11px] font-black text-slate-500 mb-2.5">
+                      رمز كود الخصم
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={pCode}
+                        onChange={(e) => setPCode(e.target.value.toUpperCase())}
+                        required
+                        placeholder="مثال: COUPO20"
+                        className="w-full bg-white border border-slate-200 hover:border-purple-200 focus:border-[#9952FF] focus:ring-4 focus:ring-purple-50 p-4 rounded-2xl font-mono text-center text-lg font-black uppercase tracking-widest text-[#4D2980] transition-all"
+                      />
+                      <div className="absolute inset-y-0 right-4 flex items-center pointer-events-none text-slate-300">
+                        <Gift size={18} />
                       </div>
                     </div>
-                  )}
-                </div>
+                    <p className="text-[9px] text-slate-400 mt-2 text-center">سيتم تحويل الأحرف إلى اللغة الإنجليزية الكبيرة تلقائياً</p>
+                  </div>
 
-                <button
-                  type="submit"
-                  className="w-full py-4 bg-[#9952FF] text-white font-black rounded-2xl shadow-lg mt-4 text-sm mt-6"
-                >
-                  تفعيل الكود
-                </button>
-              </form>
+                  {/* نوع الخصم والقيمة */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[11px] font-black text-slate-500 mb-1.5">
+                        نوع الخصم
+                      </label>
+                      <div className="relative">
+                        <select
+                          value={pDiscountType}
+                          onChange={(e) => setPDiscountType(e.target.value as any)}
+                          className="w-full bg-white border border-slate-200 hover:border-purple-200 focus:border-[#9952FF] p-3.5 rounded-2xl text-xs font-bold text-slate-700 appearance-none focus:outline-none focus:ring-4 focus:ring-purple-50 transition-all cursor-pointer"
+                        >
+                          <option value="amount">مبلغ ثابت (د.ع)</option>
+                          <option value="percent">نسبة مئوية (%)</option>
+                        </select>
+                        <div className="absolute inset-y-0 left-3.5 flex items-center pointer-events-none text-slate-400">
+                          <ChevronDown size={14} />
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-[11px] font-black text-slate-500 mb-1.5">
+                        القيمة
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          value={pDiscount || ""}
+                          onChange={(e) => setPDiscount(parseInt(e.target.value) || 0)}
+                          required
+                          min="1"
+                          placeholder="0"
+                          className="w-full bg-white border border-slate-200 hover:border-purple-200 focus:border-[#9952FF] focus:ring-4 focus:ring-purple-50 p-3.5 rounded-2xl text-center text-xs font-black text-slate-800 transition-all"
+                        />
+                        <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none text-xs font-black text-slate-400 font-mono">
+                          {pDiscountType === "amount" ? "IQD" : "%"}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* قيود الاستخدام */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[11px] font-black text-slate-500 mb-1.5">
+                        إجمالي الاستخدام
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          value={pMaxUses || ""}
+                          onChange={(e) => setPMaxUses(parseInt(e.target.value) || 0)}
+                          required
+                          min="1"
+                          className="w-full bg-white border border-slate-200 hover:border-purple-200 focus:border-[#9952FF] focus:ring-4 focus:ring-purple-50 p-3.5 rounded-2xl text-center text-xs font-black text-slate-800 transition-all"
+                        />
+                        <div className="absolute inset-y-0 right-4 flex items-center pointer-events-none text-slate-300">
+                          <Users size={14} />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-black text-slate-500 mb-1.5">
+                        للزبون الواحد
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          value={pMaxUsesPerUser || ""}
+                          onChange={(e) => setPMaxUsesPerUser(parseInt(e.target.value) || 0)}
+                          required
+                          min="1"
+                          className="w-full bg-white border border-slate-200 hover:border-purple-200 focus:border-[#9952FF] focus:ring-4 focus:ring-purple-50 p-3.5 rounded-2xl text-center text-xs font-black text-slate-800 transition-all"
+                        />
+                        <div className="absolute inset-y-0 right-4 flex items-center pointer-events-none text-slate-300">
+                          <User size={14} />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* الصلاحية */}
+                  <div className="bg-slate-50/50 p-4 rounded-3xl border border-slate-100 space-y-3">
+                    <div>
+                      <label className="block text-[11px] font-black text-slate-500 mb-1.5">
+                        مدة صلاحية الكود
+                      </label>
+                      <div className="relative">
+                        <select
+                          value={pExpiryType}
+                          onChange={(e) => setPExpiryType(e.target.value as any)}
+                          className="w-full bg-white border border-slate-200 hover:border-purple-200 focus:border-[#9952FF] p-3 rounded-2xl text-xs font-bold text-slate-700 appearance-none focus:outline-none focus:ring-4 focus:ring-purple-50 transition-all cursor-pointer"
+                        >
+                          <option value="days">تفعيل لعدد أيام متبقية</option>
+                          <option value="date">تحديد تاريخ بدء وانتهاء مخصص</option>
+                        </select>
+                        <div className="absolute inset-y-0 left-3.5 flex items-center pointer-events-none text-slate-400">
+                          <ChevronDown size={14} />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* تغيير الإدخال ديناميكياً بناءً على نوع الصلاحية */}
+                    <AnimatePresence mode="wait">
+                      {pExpiryType === "days" ? (
+                        <motion.div
+                          key="days"
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: "auto" }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="relative"
+                        >
+                          <input
+                            type="number"
+                            placeholder="مثال: 30"
+                            value={pExpiryDays || ""}
+                            onChange={(e) => setPExpiryDays(parseInt(e.target.value) || 0)}
+                            required
+                            min="1"
+                            className="w-full bg-white border border-slate-200 hover:border-purple-200 focus:border-[#9952FF] focus:ring-4 focus:ring-purple-50 p-3 rounded-2xl text-center text-xs font-black text-slate-800 transition-all"
+                          />
+                          <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none text-xs font-bold text-slate-400 font-tajawal">
+                            أيام
+                          </div>
+                        </motion.div>
+                      ) : (
+                        <motion.div
+                          key="date"
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: "auto" }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="grid grid-cols-2 gap-3"
+                        >
+                          <div>
+                            <label className="block text-[9px] font-black text-slate-400 mb-1">
+                              تاريخ البدء (اختياري)
+                            </label>
+                            <input
+                              type="date"
+                              value={pStartDate}
+                              onChange={(e) => setPStartDate(e.target.value)}
+                              className="w-full bg-white border border-slate-200 hover:border-purple-200 focus:border-[#9952FF] p-2.5 rounded-xl text-center text-xs font-bold text-slate-700 transition-all"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[9px] font-black text-slate-400 mb-1">
+                              تاريخ الانتهاء
+                            </label>
+                            <input
+                              type="date"
+                              value={pEndDate}
+                              onChange={(e) => setPEndDate(e.target.value)}
+                              required
+                              className="w-full bg-white border border-slate-200 hover:border-purple-200 focus:border-[#9952FF] p-2.5 rounded-xl text-center text-xs font-bold text-slate-700 transition-all"
+                            />
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+
+                  {/* أزرار الإجراءات */}
+                  <div className="pt-2 flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setPromoModal(false)}
+                      className="w-1/3 py-3.5 bg-slate-100 hover:bg-slate-200 active:scale-[0.98] text-slate-600 font-black rounded-2xl text-xs transition-colors cursor-pointer"
+                    >
+                      إلغاء
+                    </button>
+                    <button
+                      type="submit"
+                      className="w-2/3 py-3.5 bg-gradient-to-r from-[#9952FF] to-[#8033FF] hover:from-[#8033FF] hover:to-[#6B24E2] active:scale-[0.98] text-white font-black rounded-2xl shadow-lg shadow-purple-100/50 text-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      <CheckCircle size={15} />
+                      <span>تفعيل الكود ونشره</span>
+                    </button>
+                  </div>
+                </form>
+              </motion.div>
             </div>
-          </div>
-        )}
+          )}
+        </AnimatePresence>
 
         {/* Modal: إجراءات الطلب (رفض/إرجاع/استبدال) */}
         {actionModal.show && (
@@ -4362,8 +5028,12 @@ https://mahallak.app/store/${data.id}`
                       <div className="text-left" dir="ltr">
                         <h1 className="text-4xl font-black text-slate-200 uppercase tracking-widest mb-4">INVOICE</h1>
                         <div className="space-y-1">
-                          <p className="text-[10px] font-black text-slate-400">رقم الفاتورة: <span className="text-[#4D2980]">#{selectedInvoice.id}</span></p>
-                          <p className="text-[10px] font-black text-slate-400">التاريخ: <span className="text-[#4D2980]">{new Date(selectedInvoice.createdAt).toLocaleDateString("ar-IQ")}</span></p>
+                          <div className="text-[10px] font-black text-slate-400 flex items-center justify-end gap-1">
+                            <span>رقم الفاتورة: </span>
+                            <span className="text-[#4D2980]">#{getOrderSeqId(selectedInvoice.id)}</span>
+                            <CopyButton text={getOrderSeqId(selectedInvoice.id)} size={9} className="print:hidden" />
+                          </div>
+                          <p className="text-[10px] font-black text-slate-400">التاريخ: <span className="text-[#4D2980]">{formatSafeDateTimeString(selectedInvoice.createdAt, 'ar-IQ', { dateStyle: 'short', timeStyle: 'short' })}</span></p>
                         </div>
                       </div>
                     </div>
@@ -4372,29 +5042,33 @@ https://mahallak.app/store/${data.id}`
                     <div className="grid grid-cols-2 gap-8 mb-10">
                       <div>
                         <p className="text-[10px] font-black text-slate-400 uppercase mb-3 border-r-4 border-slate-500 pr-3">مستلم الفاتورة:</p>
-                        <p className="text-sm font-black text-[#4D2980] mb-1">{selectedInvoice.customerName}</p>
-                        <p className="text-xs font-bold text-slate-500 mb-1">{selectedInvoice.customerPhone}</p>
+                        <p className="text-sm font-black text-[#4D2980] mb-1 flex items-center gap-1">
+                          <span>{selectedInvoice.customerName}</span>
+                          <CopyButton text={selectedInvoice.customerName} size={10} className="print:hidden" />
+                        </p>
+                        <p className="text-[10px] font-mono text-purple-600 mb-1 select-all inline-flex items-center gap-1">
+                          <span>ID: #{getCustomerSeqId(selectedInvoice.customerId)}</span>
+                          <CopyButton text={getCustomerSeqId(selectedInvoice.customerId)} size={9} className="print:hidden" />
+                        </p>
+                        <p className="text-xs font-bold text-slate-500 mb-1 flex items-center gap-1">
+                          <span>{selectedInvoice.customerPhone}</span>
+                          <CopyButton text={selectedInvoice.customerPhone} size={9} className="print:hidden" />
+                        </p>
                         <p className="text-xs font-bold text-slate-400 leading-relaxed italic mb-2">{selectedInvoice.customerProvince} - {selectedInvoice.customerAddress}</p>
                         {(selectedInvoice as any).customerLat && (selectedInvoice as any).customerLng && (
-                          <div className="flex gap-2">
-                            <a 
-                              href={`https://www.google.com/maps/search/?api=1&query=${(selectedInvoice as any).customerLat},${(selectedInvoice as any).customerLng}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-center gap-1 text-[9px] font-black bg-white border border-slate-200 text-slate-600 px-2 py-1 rounded-lg shadow-sm hover:bg-slate-50 transition-colors"
+                          <div className="flex gap-2 mt-3 font-tajawal">
+                            <button
+                              onClick={() => openNativeMapApp((selectedInvoice as any).customerLat, (selectedInvoice as any).customerLng, 'google')}
+                              className="flex-1 py-3.5 bg-[#9952FF] hover:bg-[#853df2] text-white font-black text-xs rounded-xl flex items-center justify-center gap-2 shadow-lg active:scale-95 transition print:hidden"
                             >
-                              <MapPin size={12} className="text-red-500" />
-                              خرائط جوجل (Google Maps)
-                            </a>
-                            <a 
-                              href={`https://waze.com/ul?ll=${(selectedInvoice as any).customerLat},${(selectedInvoice as any).customerLng}&navigate=yes`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-center gap-1 text-[9px] font-black bg-[#f2fcfed9] border border-[#c2f2ff] text-[#00a9e0] px-2 py-1 rounded-lg shadow-sm hover:bg-[#e6faff] transition-colors"
+                              <span>فتح عبر Google Maps</span>
+                            </button>
+                            <button
+                              onClick={() => openNativeMapApp((selectedInvoice as any).customerLat, (selectedInvoice as any).customerLng, 'waze')}
+                              className="flex-1 py-3.5 bg-sky-500 hover:bg-sky-600 text-white font-black text-xs rounded-xl flex items-center justify-center gap-2 shadow-lg active:scale-95 transition print:hidden"
                             >
-                              <Car size={12} />
-                              خرائط ويز (Waze)
-                            </a>
+                              <span>فتح عبر Waze</span>
+                            </button>
                           </div>
                         )}
                       </div>
@@ -4566,12 +5240,20 @@ https://mahallak.app/store/${data.id}`
         )}
         {/* Modal: إرسال هدية */}
         {giftModal.show && (
-          <div className="fixed inset-0 bg-[#4D2980]/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl animate-fade-in text-right">
-              <div className="flex justify-between items-center mb-6 pb-2 border-b">
-                <h3 className="font-black text-[#4D2980]">
-                  إرسال هدية لـ {giftModal.customerName}
-                </h3>
+          <div className="fixed inset-0 bg-[#4D2980]/50 backdrop-blur-sm z-[115] flex items-center justify-center p-4 overflow-y-auto" dir="rtl">
+            <div className="bg-white rounded-[2.5rem] w-full max-w-md p-8 shadow-2xl animate-fade-in text-right max-h-[90vh] overflow-y-auto border border-slate-100 no-scrollbar relative">
+              <div className="flex justify-between items-start mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-pink-50 text-pink-600 rounded-2xl flex items-center justify-center border border-pink-100 shrink-0">
+                    <Gift size={24} className="animate-pulse" />
+                  </div>
+                  <div>
+                    <h3 className="font-black text-lg text-slate-800 leading-tight">
+                      إرسال هدية لـ {giftModal.customerName}
+                    </h3>
+                    <p className="text-[10px] font-medium text-slate-400 mt-0.5">اختر كود خصم مخصص أو منتج مجاني لإسعاده</p>
+                  </div>
+                </div>
                 <button
                   onClick={() =>
                     setGiftModal({
@@ -4580,35 +5262,180 @@ https://mahallak.app/store/${data.id}`
                       customerName: "",
                     })
                   }
+                  className="p-2 hover:bg-slate-100 rounded-full transition-colors cursor-pointer text-slate-400 hover:text-slate-600"
                 >
-                  <X size={18} className="text-slate-400" />
+                  <X size={18} />
                 </button>
               </div>
-              <form onSubmit={handleSendGift} className="space-y-4">
-                <p className="text-xs text-slate-500">
-                  سيتم إنشاء كود خصم خاص بشراء واحد فقط وإرساله كإشعار للزبون.
-                </p>
+
+              <form onSubmit={handleSendGift} className="space-y-5">
+                {/* اختيار نوع الهدية */}
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1">
-                    قيمة الخصم (د.ع)
+                  <label className="block text-[11px] font-black text-slate-400 mb-2 mr-1 uppercase tracking-widest">
+                    نوع الهدية المختارة
                   </label>
-                  <input
-                    type="number"
-                    value={giftAmount}
-                    onChange={(e) =>
-                      setGiftAmount(parseInt(e.target.value) || 0)
-                    }
-                    required
-                    className="w-full border p-3 rounded-2xl text-center text-lg font-black text-[#4D2980]"
-                  />
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setGiftType("promo")}
+                      className={`py-3 px-4 rounded-xl font-black text-xs transition-all flex items-center justify-center gap-2 border cursor-pointer ${
+                        giftType === "promo"
+                          ? "bg-purple-50 border-[#9952FF] text-[#9952FF] shadow-sm"
+                          : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                      }`}
+                    >
+                      <Ticket size={16} />
+                      <span>كود خصم (كوبون)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setGiftType("product");
+                        // Pre-populate product if none selected
+                        const storeProds = products.filter(p => p.storeId === currentMerchant!.id && p.status === "published");
+                        if (storeProds.length > 0 && !giftProductId) {
+                          setGiftProductId(storeProds[0].id);
+                        }
+                      }}
+                      className={`py-3 px-4 rounded-xl font-black text-xs transition-all flex items-center justify-center gap-2 border cursor-pointer ${
+                        giftType === "product"
+                          ? "bg-purple-50 border-[#9952FF] text-[#9952FF] shadow-sm"
+                          : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                      }`}
+                    >
+                      <Gift size={16} />
+                      <span>منتج من المتجر</span>
+                    </button>
+                  </div>
                 </div>
-                <button
-                  type="submit"
-                  className="w-full py-4 bg-pink-600 text-white font-black rounded-2xl shadow-lg shadow-pink-100 flex items-center justify-center gap-2"
-                >
-                  <Gift size={20} />
-                  <span>إرسال الهدية الآن</span>
-                </button>
+
+                {giftType === "promo" ? (
+                  <>
+                    <p className="text-[11px] text-slate-500 bg-slate-50 p-3 rounded-2xl border border-slate-100 leading-relaxed">
+                      💡 سيتم توليد كود خصم مخصص حصرياً للزبون وإضافته لمحفظته مع إرسال إشعار فوري له للتشجيع على الشراء.
+                    </p>
+
+                    {/* حقول إنشاء كود الخصم (نوع الخصم وقيمة الخصم) */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-[11px] font-black text-slate-500 mb-1.5">
+                          نوع الخصم
+                        </label>
+                        <div className="relative">
+                          <select
+                            value={giftDiscountType}
+                            onChange={(e) => setGiftDiscountType(e.target.value as any)}
+                            className="w-full bg-white border border-slate-200 hover:border-purple-200 focus:border-[#9952FF] p-3 text-xs font-bold text-slate-700 appearance-none focus:outline-none focus:ring-4 focus:ring-purple-50 transition-all cursor-pointer"
+                          >
+                            <option value="amount">مبلغ ثابت (د.ع)</option>
+                            <option value="percent">نسبة مئوية (%)</option>
+                          </select>
+                          <div className="absolute inset-y-0 left-3.5 flex items-center pointer-events-none text-slate-400">
+                            <ChevronDown size={14} />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-black text-slate-500 mb-1.5">
+                          قيمة الخصم
+                        </label>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            value={giftAmount || ""}
+                            onChange={(e) => setGiftAmount(parseInt(e.target.value) || 0)}
+                            required
+                            min="1"
+                            className="w-full bg-white border border-slate-200 hover:border-purple-200 focus:border-[#9952FF] focus:ring-4 focus:ring-purple-50 p-3 text-center text-xs font-black text-slate-800 transition-all"
+                          />
+                          <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none text-xs font-black text-slate-400 font-mono">
+                            {giftDiscountType === "amount" ? "IQD" : "%"}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* مدة الصلاحية بالأيام */}
+                    <div>
+                      <label className="block text-[11px] font-black text-slate-500 mb-1.5">
+                        مدة الصلاحية بالـ أيام
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          placeholder="مثال: 30"
+                          value={giftExpiryDays || ""}
+                          onChange={(e) => setGiftExpiryDays(parseInt(e.target.value) || 0)}
+                          required
+                          min="1"
+                          className="w-full bg-white border border-slate-200 hover:border-purple-200 focus:border-[#9952FF] focus:ring-4 focus:ring-purple-50 p-3 text-center text-xs font-black text-slate-800 transition-all"
+                        />
+                        <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none text-xs font-black text-slate-400">
+                          أيام
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-[11px] text-slate-500 bg-slate-50 p-3 rounded-2xl border border-slate-100 leading-relaxed">
+                      💡 اختر أحد المنتجات المتاحة في متجرك لتقوم بإهدائه للزبون، وسيصله إشعار دافئ ورائع لمراجعة المتجر واستلام الهدية.
+                    </p>
+
+                    {/* اختيار المنتج */}
+                    <div>
+                      <label className="block text-[11px] font-black text-slate-500 mb-1.5">
+                        اختر المنتج الهدية
+                      </label>
+                      <div className="relative">
+                        <select
+                          value={giftProductId}
+                          onChange={(e) => setGiftProductId(e.target.value)}
+                          className="w-full bg-white border border-slate-200 hover:border-purple-200 focus:border-[#9952FF] p-3 text-xs font-bold text-slate-700 appearance-none focus:outline-none focus:ring-4 focus:ring-purple-50 transition-all cursor-pointer"
+                        >
+                          {products
+                            .filter(p => p.storeId === currentMerchant!.id && p.status === "published")
+                            .map((p) => (
+                              <option key={p.id} value={p.id}>
+                                {p.name} ({p.price.toLocaleString()} د.ع)
+                              </option>
+                            ))}
+                          {products.filter(p => p.storeId === currentMerchant!.id && p.status === "published").length === 0 && (
+                            <option value="">لا توجد منتجات منشورة حالياً في المتجر</option>
+                          )}
+                        </select>
+                        <div className="absolute inset-y-0 left-3.5 flex items-center pointer-events-none text-slate-400">
+                          <ChevronDown size={14} />
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* أزرار الإجراء للهدية */}
+                <div className="pt-2 flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setGiftModal({
+                        show: false,
+                        customerId: "",
+                        customerName: "",
+                      })
+                    }
+                    className="w-1/3 py-3.5 bg-slate-100 hover:bg-slate-200 active:scale-[0.98] text-slate-600 font-black rounded-2xl text-xs transition-colors cursor-pointer"
+                  >
+                    إلغاء
+                  </button>
+                  <button
+                    type="submit"
+                    className="w-2/3 py-3.5 bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 active:scale-[0.98] text-white font-black rounded-2xl shadow-lg shadow-rose-100/50 text-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <Gift size={16} />
+                    <span>إرسال الهدية الآن 🎉</span>
+                  </button>
+                </div>
               </form>
             </div>
           </div>
@@ -4891,8 +5718,18 @@ https://mahallak.app/store/${data.id}`
                        <div className="w-24 h-24 bg-gradient-to-br from-slate-100 to-slate-200 text-[#4D2980] flex items-center justify-center rounded-2xl mx-auto mb-4 shadow-inner">
                          <span className="text-4xl font-black">{aud.name.charAt(0)}</span>
                        </div>
-                       <h2 className="text-2xl font-black text-[#4D2980]">{aud.name}</h2>
-                       <p className="text-sm text-slate-500 font-mono mt-1" dir="ltr">{aud.phone}</p>
+                       <h2 className="text-2xl font-black text-[#4D2980] flex items-center justify-center gap-1.5">
+                         <span>{aud.name}</span>
+                         <CopyButton text={aud.name} size={15} />
+                       </h2>
+                       <div className="flex items-center justify-center gap-1.5 mt-1">
+                         <span className="text-xs font-mono text-purple-600 select-all" dir="ltr">ID: #{getCustomerSeqId(aud.id)}</span>
+                         <CopyButton text={getCustomerSeqId(aud.id)} size={11} />
+                       </div>
+                       <div className="flex items-center justify-center gap-1.5 mt-1">
+                         <p className="text-sm text-slate-500 font-mono" dir="ltr">{aud.phone}</p>
+                         <CopyButton text={aud.phone} size={11} />
+                       </div>
                        <div className="flex justify-center gap-2 mt-4">
                           <span className={`px-4 py-1.5 rounded-xl font-black text-xs shadow-sm border ${
                             aud.tier === "Diamond" ? "bg-slate-50 border-slate-200 text-slate-700" :
@@ -4922,6 +5759,34 @@ https://mahallak.app/store/${data.id}`
                        <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 col-span-2">
                           <span className="text-[10px] text-slate-400 font-bold block mb-1">العنوان (المحافظة)</span>
                           <span className="text-sm font-bold text-slate-700">{aud.province}</span>
+                       </div>
+
+                       {/* قسم الإجراءات والرقابة للتاجر وحظر الزبائن */}
+                       <div className="bg-[#fff5f5] p-5 rounded-2xl border border-red-100 col-span-2 text-right">
+                          <span className="text-[10px] text-red-500 font-black block mb-1">إجراءات الرقابة والحماية 🛡️</span>
+                          <p className="text-[9px] text-slate-500 mb-3 leading-relaxed">
+                            {aud.isBlocked 
+                              ? "هذا الزبون محظور حالياً من رؤية متجرك أو تقديم طلبات جديدة." 
+                              : "حظر الزبون يمنعه بشكل فوري ومؤقت من الوصول للمتجر أو إرسال طلبات جديدة."}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setBlockConfirm({
+                                show: true,
+                                customerId: aud.id,
+                                name: aud.name,
+                                isBlocked: !!aud.isBlocked
+                              });
+                            }}
+                            className={`w-full py-2.5 rounded-xl font-black text-xs transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm ${
+                              aud.isBlocked 
+                                ? "bg-emerald-600 hover:bg-emerald-700 text-white" 
+                                : "bg-red-600 hover:bg-red-700 text-white"
+                            }`}
+                          >
+                            <span>{aud.isBlocked ? "إلغاء حظر الزبون وتفعيله ✅" : "حظر هذا الزبون فوراً 🚫"}</span>
+                          </button>
                        </div>
 
                        <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 col-span-2">
@@ -4961,6 +5826,65 @@ https://mahallak.app/store/${data.id}`
              </div>
            );
         })()}
+        <BackgroundRemover
+          isOpen={showBgRemoverModal}
+          onClose={() => setShowBgRemoverModal(false)}
+          onSelectImage={setProdImage}
+        />
+
+        {/* نافذة عرض الروابط الخارجية داخل التطبيق مع زر الرجوع للتطبيق */}
+        <AnimatePresence>
+          {iframeUrl && (
+            <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-[150] flex flex-col overflow-hidden animate-fade-in" dir="rtl">
+              {/* شريط التحكم العلوي */}
+              <div className="bg-gradient-to-l from-[#4D2980] to-[#381a66] text-white py-3 px-4 flex items-center justify-between shadow-lg border-b border-white/10 z-50">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center">
+                    <StoreIcon size={18} className="text-amber-400" />
+                  </div>
+                  <div className="max-w-[150px] sm:max-w-xs text-right">
+                    <h3 className="text-xs sm:text-sm font-black text-white font-tajawal">مستعرض محلك الداخلي</h3>
+                    <p className="text-[10px] text-slate-300 font-bold truncate leading-none mt-0.5">{iframeUrl}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      try {
+                        navigator.clipboard.writeText(iframeUrl);
+                        alert('تم نسخ الرابط بنجاح! ✅');
+                      } catch (err) {
+                        console.error(err);
+                      }
+                    }}
+                    className="p-2 hover:bg-white/10 rounded-xl text-white transition-colors animate-pulse"
+                    title="نسخ الرابط"
+                  >
+                    <Copy size={16} />
+                  </button>
+                  <button
+                    onClick={() => setIframeUrl(null)}
+                    className="px-4 py-2 sm:px-5 sm:py-2.5 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 active:scale-95 text-slate-900 font-extrabold rounded-xl text-xs sm:text-sm shadow-md transition-all flex items-center gap-1.5"
+                  >
+                    <ChevronRight size={16} className="rotate-180" />
+                    <span>الرجوع للتطبيق</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* محتوى الصفحة الخارجي */}
+              <div className="flex-1 bg-white relative">
+                <iframe
+                  src={iframeUrl}
+                  className="w-full h-full border-none"
+                  title="موقع خارجي"
+                  sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+                />
+              </div>
+            </div>
+          )}
+        </AnimatePresence>
       </div>
     );
   }
@@ -5455,6 +6379,60 @@ https://mahallak.app/store/${data.id}`
           </form>
         )}
       </div>
+
+      {/* نافذة عرض الروابط الخارجية داخل التطبيق مع زر الرجوع للتطبيق */}
+      <AnimatePresence>
+        {iframeUrl && (
+          <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-[150] flex flex-col overflow-hidden animate-fade-in" dir="rtl">
+            {/* شريط التحكم العلوي */}
+            <div className="bg-gradient-to-l from-[#4D2980] to-[#381a66] text-white py-3 px-4 flex items-center justify-between shadow-lg border-b border-white/10 z-50">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center">
+                  <StoreIcon size={18} className="text-amber-400" />
+                </div>
+                <div className="max-w-[150px] sm:max-w-xs text-right">
+                  <h3 className="text-xs sm:text-sm font-black text-white font-tajawal">مستعرض محلك الداخلي</h3>
+                  <p className="text-[10px] text-slate-300 font-bold truncate leading-none mt-0.5">{iframeUrl}</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    try {
+                      navigator.clipboard.writeText(iframeUrl);
+                      alert('تم نسخ الرابط بنجاح! ✅');
+                    } catch (err) {
+                      console.error(err);
+                    }
+                  }}
+                  className="p-2 hover:bg-white/10 rounded-xl text-white transition-colors animate-pulse"
+                  title="نسخ الرابط"
+                >
+                  <Copy size={16} />
+                </button>
+                <button
+                  onClick={() => setIframeUrl(null)}
+                  className="px-4 py-2 sm:px-5 sm:py-2.5 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 active:scale-95 text-slate-900 font-extrabold rounded-xl text-xs sm:text-sm shadow-md transition-all flex items-center gap-1.5"
+                >
+                  <ChevronRight size={16} className="rotate-180" />
+                  <span>الرجوع للتطبيق</span>
+                </button>
+              </div>
+            </div>
+
+            {/* محتوى الصفحة الخارجي */}
+            <div className="flex-1 bg-white relative">
+              <iframe
+                src={iframeUrl}
+                className="w-full h-full border-none"
+                title="موقع خارجي"
+                sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+              />
+            </div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

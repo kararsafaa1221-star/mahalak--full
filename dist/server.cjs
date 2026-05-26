@@ -24,14 +24,9 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 
 // server.ts
 var import_express = __toESM(require("express"), 1);
-var import_vite = require("vite");
 var import_path = __toESM(require("path"), 1);
-var import_url = require("url");
 var import_axios = __toESM(require("axios"), 1);
 var import_cors = __toESM(require("cors"), 1);
-var import_meta = {};
-var __filename = (0, import_url.fileURLToPath)(import_meta.url);
-var __dirname = import_path.default.dirname(__filename);
 async function startServer() {
   const app = (0, import_express.default)();
   const PORT = 3e3;
@@ -81,7 +76,8 @@ async function startServer() {
     }
   });
   if (process.env.NODE_ENV !== "production") {
-    const vite = await (0, import_vite.createServer)({
+    const { createServer: createViteServer } = await import("vite");
+    const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa"
     });

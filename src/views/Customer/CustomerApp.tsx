@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useApp } from '../../context/useApp';
 import { Product, Store, Customer } from '../../types';
 import { STORE_CATEGORIES, STORE_BADGES } from '../../constants';
@@ -6,12 +6,28 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   ShoppingBag, Heart, Wallet, User, Users, Search, MapPin, Home,  Phone, Plus, Minus, Check, X, ClipboardList, Share2, Camera,
   Gift, Award, Bell, ShieldAlert, Store as StoreIcon, Trash2, LogOut,
-  Ticket, Copy, Shield, Zap, ChevronRight, ChevronLeft, ShoppingCart, LayoutGrid, Sparkles, Shirt, ChevronDown, Star, Clock, CheckCircle, AlertCircle, Info, BellOff, Calendar, Lock, MessageCircle, RefreshCw, Send,
+  Ticket, Copy, Shield, Zap, ChevronRight, ChevronLeft, ShoppingCart, LayoutGrid, Sparkles, Shirt, ChevronDown, Star, Clock, CheckCircle, AlertCircle, AlertTriangle, Info, BellOff, Calendar, Lock, MessageCircle, RefreshCw, Send,
   Smartphone, Laptop, Tv, Lightbulb, Bed, Hammer, Car, Bike, BookOpen, Dumbbell, Gem, Candy, Flower2, Briefcase, Beef, Pill
 } from 'lucide-react';
 import { sendOTP } from '../../services/otpService';
 import { LocationPicker } from '../../components/LocationPicker';
+import { VerifiedBadge } from '../../components/VerifiedBadge';
+import { ReelsFeed } from '../../components/ReelsFeed';
+import { ReelsProfileList } from '../../components/ReelsProfileList';
+import { MapContainer, TileLayer, Marker } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
+import L from 'leaflet';
+
+// Fix leaflet marker icon issue
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png",
+  iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
+  shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
+});
+
 import { showLocalNotification, requestNotificationPermission, setupPushNotifications } from '../../lib/pushNotifications';
+import { formatSafeDate, formatSafeTimeString, formatSafeDateTimeString } from '../../utils/date';
 
 const notificationSound = new Audio(
   "https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3",
@@ -92,6 +108,60 @@ const getCategoryIcon = (catId: string, isSelected: boolean, size = 14) => {
 };
 
 // ==========================================
+// مكون زر إلغاء الطلب بفترة سماح 30 ثانية
+// ==========================================
+interface CancelOrderButtonProps {
+  order: any;
+  onCancelClick: (order: any) => void;
+}
+
+const CancelOrderButton: React.FC<CancelOrderButtonProps> = ({ order, onCancelClick }) => {
+  const [timeLeft, setTimeLeft] = useState<number>(0);
+
+  useEffect(() => {
+    const checkTime = () => {
+      if (order.status !== 'pending') {
+        setTimeLeft(0);
+        return;
+      }
+      
+      let orderTime: number;
+      if (order.createdAt) {
+        if (typeof order.createdAt.toDate === 'function') {
+          orderTime = order.createdAt.toDate().getTime();
+        } else if (typeof order.createdAt.seconds === 'number') {
+          orderTime = order.createdAt.seconds * 1000;
+        } else {
+          orderTime = new Date(order.createdAt).getTime();
+        }
+      } else {
+        orderTime = Date.now();
+      }
+
+      const elapsed = Math.floor((Date.now() - orderTime) / 1000);
+      const remaining = 30 - elapsed;
+      setTimeLeft(remaining > 0 ? remaining : 0);
+    };
+
+    checkTime();
+    const interval = setInterval(checkTime, 1000);
+    return () => clearInterval(interval);
+  }, [order]);
+
+  if (order.status !== 'pending' || timeLeft <= 0) return null;
+
+  return (
+    <button
+      onClick={() => onCancelClick(order)}
+      className="mt-4 w-full py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-100 rounded-2xl text-[11px] font-black flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95"
+    >
+      <Clock size={12} className="animate-pulse" />
+      <span>إلغاء الطلب (متاح لـ {timeLeft} ثانية)</span>
+    </button>
+  );
+};
+
+// ==========================================
 // تطبيق الزبون - منصة محلك (Customer App)
 // ==========================================
 
@@ -102,7 +172,7 @@ export const CustomerApp: React.FC = () => {
     notifications, markNotificationAsRead, markAllNotificationsAsRead, convertPointsToPromo,
     customers, provinces, addCustomerPoints, adminSettings, submitStoreReview, storeReviews,
     flashSales, flashSaleRequests,
-    redeemRechargeCode
+    redeemRechargeCode, seedDatabase, updateOrderStatus
   } = useApp();
 
   const products = useMemo(() => {
@@ -138,9 +208,30 @@ export const CustomerApp: React.FC = () => {
   
   // تتبع الطلب المحدد من الإشعارات
   const [targetOrderId, setTargetOrderId] = useState<string | null>(null);
+
+  // تتبع الطلب المراد إلغاؤه من قبل الزبون
+  const [orderToCancel, setOrderToCancel] = useState<any | null>(null);
   
   // إدارة التصفح داخل المتجر المختار
-  const [selectedStore, setSelectedStore] = useState<Store | null>(null);
+  const [selectedStore, setRawSelectedStore] = useState<Store | null>(null);
+
+  const setSelectedStore = useCallback((store: Store | null) => {
+    if (store) {
+      if (window['appScrollingStateActiveStoreId'] !== store.id) {
+        window['appScrollingStateLastScrollY'] = window.scrollY;
+      }
+      window['appScrollingStateActiveStoreId'] = store.id;
+      setRawSelectedStore(store);
+      setTimeout(() => window.scrollTo({ top: 0, behavior: 'instant' }), 0); // Scroll to top when opening store
+    } else {
+      window['appScrollingStateActiveStoreId'] = null;
+      setRawSelectedStore(null);
+      // Ensure the DOM has a moment to render the previous list before scrolling
+      setTimeout(() => {
+        window.scrollTo({ top: window['appScrollingStateLastScrollY'] || 0, behavior: 'instant' });
+      }, 50);
+    }
+  }, []);
 
   const uniqueStores = useMemo(() => {
     const map = new Map<string, Store>();
@@ -163,6 +254,7 @@ export const CustomerApp: React.FC = () => {
   const [selectedProductTag, setSelectedProductTag] = useState<string>('');
   const [showFullFeatured, setShowFullFeatured] = useState(false);
   const [showFullNearby, setShowFullNearby] = useState(false);
+  const [showFullVerified, setShowFullVerified] = useState(false);
   const [showCategories, setShowCategories] = useState(false);
   
   // السلة (Cart)
@@ -226,10 +318,74 @@ export const CustomerApp: React.FC = () => {
   // ==========================================
   const isPopStateRef = React.useRef(false);
 
+  const getHashUrl = (state: any) => {
+    let sub = '';
+    if (state.view === 'login') sub = '/login';
+    else if (state.view === 'signup') sub = '/signup';
+    else if (state.view === 'otp') sub = '/otp';
+    else if (state.view === 'forgot') sub = '/forgot';
+    else if (state.view === 'dashboard') {
+      if (state.selectedStoreId) {
+        if (state.selectedProductDetailId) {
+          sub = `/store/${state.selectedStoreId}/product/${state.selectedProductDetailId}`;
+        } else {
+          sub = `/store/${state.selectedStoreId}`;
+        }
+      } else if (state.showCart) {
+        sub = '/cart';
+      } else if (state.showNotifications) {
+        sub = '/notifications';
+      } else {
+        sub = `/${state.activeTab}`;
+      }
+    }
+    return `#/customer${sub}`;
+  };
+
+  const parseHashToState = (hash: string) => {
+    const path = hash.replace('#/customer', '');
+    const parts = path.split('/').filter(Boolean);
+    
+    const state: any = {
+      view: 'dashboard',
+      activeTab: 'stores',
+      selectedStoreId: null,
+      selectedProductDetailId: null,
+      showCart: false,
+      showNotifications: false
+    };
+
+    if (parts[0] === 'login') {
+      state.view = 'login';
+    } else if (parts[0] === 'signup') {
+      state.view = 'signup';
+    } else if (parts[0] === 'otp') {
+      state.view = 'otp';
+    } else if (parts[0] === 'forgot') {
+      state.view = 'forgot';
+    } else if (parts[0] === 'store') {
+      state.view = 'dashboard';
+      state.selectedStoreId = parts[1] || null;
+      if (parts[2] === 'product') {
+        state.selectedProductDetailId = parts[3] || null;
+      }
+    } else if (parts[0] === 'cart') {
+      state.view = 'dashboard';
+      state.showCart = true;
+    } else if (parts[0] === 'notifications') {
+      state.view = 'dashboard';
+      state.showNotifications = true;
+    } else if (parts[0]) {
+      state.view = 'dashboard';
+      state.activeTab = parts[0] as any;
+    }
+    return state;
+  };
+
   React.useEffect(() => {
     const handlePopState = (event: PopStateEvent) => {
-      const state = event.state;
-      if (state && state.isAppNav) {
+      const state = event.state || parseHashToState(window.location.hash);
+      if (state && (state.isAppNav || window.location.hash.startsWith('#/customer'))) {
         isPopStateRef.current = true;
 
         if (state.view !== undefined && state.view !== view) {
@@ -286,6 +442,7 @@ export const CustomerApp: React.FC = () => {
       showNotifications
     };
 
+    const hashUrl = getHashUrl(currentState);
     const historyState = window.history.state;
     if (historyState && historyState.isAppNav) {
       const isSame = 
@@ -297,10 +454,10 @@ export const CustomerApp: React.FC = () => {
         historyState.showNotifications === currentState.showNotifications;
 
       if (!isSame) {
-        window.history.pushState(currentState, "");
+        window.history.pushState(currentState, "", hashUrl);
       }
     } else {
-      window.history.replaceState({ ...currentState, isInitial: true }, "");
+      window.history.replaceState({ ...currentState, isInitial: true }, "", hashUrl);
     }
   }, [view, activeTab, selectedStore, selectedProductDetail, showCart, showNotifications]);
 
@@ -375,6 +532,7 @@ export const CustomerApp: React.FC = () => {
   // حالة تأكيد التغييرات غير المحفوظة
   const [showUnsavedModal, setShowUnsavedModal] = useState(false);
   const [pendingTab, setPendingTab] = useState<any>(null);
+  const [iframeUrl, setIframeUrl] = useState<string | null>(null);
 
   // التحقق من وجود تغييرات غير محفوظة في الملف الشخصي
   const isProfileDirty = () => {
@@ -666,7 +824,13 @@ export const CustomerApp: React.FC = () => {
 
     return matchName && matchProvince && matchCategory && matchSubCat;
   }).sort((a, b) => {
-    // ترتيب حسب المسافة إذا توفرت الإحداثيات
+    // الترتيب حسب التوثيق أولاً: المتجر الموثق يظهر في البداية
+    const isVerifiedA = !!(a.isVerified || (a as any).is_verified);
+    const isVerifiedB = !!(b.isVerified || (b as any).is_verified);
+    if (isVerifiedA && !isVerifiedB) return -1;
+    if (!isVerifiedA && isVerifiedB) return 1;
+
+    // ثم الترتيب حسب المسافة إذا توفرت الإحداثيات
     const coords = userCoords || (currentCustomer?.lat && currentCustomer?.lng ? { lat: currentCustomer.lat, lng: currentCustomer.lng } : null);
     if (coords) {
       const distA = a.showMap !== false && a.lat && a.lng ? calculateDistance(coords.lat, coords.lng, a.lat, a.lng) : Infinity;
@@ -1144,41 +1308,75 @@ export const CustomerApp: React.FC = () => {
   const openExternalUrl = (url: string) => {
     if (!url) return;
 
-    // التحقق مما إذا كان التطبيق يعمل كـ Capacitor (أي تطبيق أندرويد/آيفون مثبت)
-    // في بيئة كاباسيتور، استخدام '_system' يوجه الرابط ليُفتح بالتطبيق الأصلي للنظام أو المتصفح الخارجي لحل مشكلة واتساب والاتصال
-    const isCapacitor = !!(window as any).Capacitor;
-    if (isCapacitor) {
-      window.open(url, '_system');
+    const lowerUrl = url.toLowerCase();
+
+    // التحقق مما إذا كان الرابط هو لأحد تطبيقات التواصل الاجتماعي، الخرائط أو الاتصال (جوجل ماب، ويز، واتساب، تليغرام، مسنجر، إنستقرام، فيسبوك، ويب، هواتف)
+    const isAppInstallLink = 
+      lowerUrl.includes('wa.me') || 
+      lowerUrl.includes('whatsapp') || 
+      lowerUrl.includes('t.me') || 
+      lowerUrl.includes('telegram') || 
+      lowerUrl.includes('maps.google') || 
+      lowerUrl.includes('google.com/maps') || 
+      lowerUrl.includes('google.co.id/maps') || 
+      lowerUrl.includes('google.iq/maps') || 
+      lowerUrl.includes('maps.apple.com') || 
+      lowerUrl.includes('waze.com') || 
+      lowerUrl.includes('waze://') || 
+      lowerUrl.includes('messenger') || 
+      lowerUrl.includes('facebook.com') || 
+      lowerUrl.includes('instagram.com') || 
+      lowerUrl.startsWith('tel:') || 
+      lowerUrl.startsWith('mailto:');
+
+    // إذا كان رابط تطبيق خارجي، نقوم بفتحه خارجياً مباشرةً (ينقله لتطبيق آخر)
+    if (isAppInstallLink) {
+      // التحقق مما إذا كان التطبيق يعمل كـ Capacitor (أي تطبيق أندرويد/آيفون مثبت)
+      // في بيئة كاباسيتور، استخدام '_system' يوجه الرابط ليُفتح بالتطبيق الأصلي للنظام أو المتصفح الخارجي لحل مشكلة واتساب والاتصال
+      const isCapacitor = !!(window as any).Capacitor;
+      if (isCapacitor) {
+        window.open(url, '_system');
+        return;
+      }
+
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      const isIframe = window.self !== window.top;
+      
+      // في الهواتف أو عند العرض داخل إطار تفاعلي (iframe)، الانتقال في الموضع الحالي (window.location.assign) 
+      // هو الأضمن لفتح تطبيق واتساب/تليغرام/مسنجر مباشرة وتجنب إعتراض المتصفح أو ظهور صفحة زرقاء
+      if (isMobile || isIframe) {
+        window.location.assign(url);
+      } else {
+        try {
+          const win = window.open(url, '_blank');
+          if (!win) {
+            window.location.assign(url);
+          }
+        } catch (_e) {
+          window.location.assign(url);
+        }
+      }
       return;
     }
 
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    const isIframe = window.self !== window.top;
-    
-    // في الهواتف أو عند العرض داخل إطار تفاعلي (iframe)، الانتقال في الموضع الحالي (window.location.assign) 
-    // هو الأضمن لفتح تطبيق واتساب/تليغرام/مسنجر مباشرة وتجنب إعتراض المتصفح أو ظهور صفحة زرقاء
-    if (isMobile || isIframe || url.includes('wa.me') || url.includes('t.me') || url.includes('messenger') || url.includes('facebook')) {
-      window.location.assign(url);
-    } else {
-      try {
-        const win = window.open(url, '_blank');
-        if (!win) {
-          window.location.assign(url);
-        }
-      } catch (_e) {
-        window.location.assign(url);
-      }
-    }
+    // إذا كان الرابط عادي وليس تطبيق تواصل أو خرائط، نفتحه في الـ Iframe داخل التطبيق لكي يسهل للمستخدم الرجوع للتطبيق بلمسة زر!
+    setIframeUrl(url);
   };
 
   // مشاركة المتجر (WhatsApp)
   // نظام المشاركة الشامل
-  const openShareModal = (type: 'store' | 'product', data: any) => {
-    const text = type === 'store' 
-      ? `ألقِ نظرة على متجر "${data.shopName}" في تطبيق محلك! محل رهيب يعرض منتجات رائعة في منطقة ${data.area}.
-رابط المتجر: https://mahallak.app/store/${data.id}`
-      : `شاهد هذا المنتج: "${data.name}" بسعر ${data.price.toLocaleString()} د.ع في متجر "${data.shopName}".
+  const openShareModal = (type: 'store' | 'product' | 'reel', data: any) => {
+    let text = '';
+    if (type === 'store') {
+      text = `ألقِ نظرة على متجر "${data.shopName}" في تطبيق محلك! محل رهيب يعرض منتجات رائعة في منطقة ${data.area}.
+رابط المتجر: https://mahallak.app/store/${data.id}`;
+    } else if (type === 'product') {
+      text = `شاهد هذا المنتج: "${data.name}" بسعر ${data.price.toLocaleString()} د.ع في متجر "${data.shopName}".
 رابط المنتج: https://mahallak.app/product/${data.id}`;
+    } else if (type === 'reel') {
+      text = `شاهد هذا الفيديو الممتع لمنتج رائع في تطبيق محلك! 🎬✨
+رابط المقطع: https://mahallak.app/reel/${data.id}`;
+    }
     
     setShareText(text);
     setShareConfig({ type, data });
@@ -1189,7 +1387,9 @@ export const CustomerApp: React.FC = () => {
     const encodedText = encodeURIComponent(shareText);
     const url = shareConfig?.type === 'store' 
       ? `https://mahallak.app/store/${shareConfig?.data?.id}` 
-      : `https://mahallak.app/product/${shareConfig?.data?.id}`;
+      : shareConfig?.type === 'product'
+      ? `https://mahallak.app/product/${shareConfig?.data?.id}`
+      : `https://mahallak.app/reel/${shareConfig?.data?.id}`;
     
     let shareUrl = '';
     switch(platform) {
@@ -1211,7 +1411,9 @@ export const CustomerApp: React.FC = () => {
     if (shareUrl) openExternalUrl(shareUrl);
     
     // مكافأة النقاط (مرة واحدة في الدقيقة تقريباً لتجنب سوء الاستخدام)
-    addCustomerPoints(currentCustomer!.id, 5);
+    if (currentCustomer) {
+      addCustomerPoints(currentCustomer.id, 5);
+    }
   };
 
   // تحويل النقاط إلى كود خصم
@@ -1332,7 +1534,7 @@ export const CustomerApp: React.FC = () => {
                   className="px-2.5 py-1 bg-white hover:bg-slate-50 rounded-xl text-slate-700 shadow-xs border border-slate-100 hover:scale-105 active:scale-95 transition-all flex items-center gap-1 font-bold text-[9.5px] sm:text-xs font-tajawal"
                 >
                   <ChevronRight size={14} />
-                  <span>رجوع للمتاجر</span>
+                  <span>رجوع</span>
                 </button>
               </div>
 
@@ -1343,9 +1545,11 @@ export const CustomerApp: React.FC = () => {
                     alt={selectedStore.shopName} 
                     className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl object-cover border-2 border-white shadow-md -mt-10 bg-white relative z-10"
                   />
-                  <div className="absolute -bottom-1 -left-1 w-5 h-5 bg-emerald-500 text-white border-2 border-white rounded-lg flex items-center justify-center shadow-xs z-20">
-                    <Check size={10} />
-                  </div>
+                  {(selectedStore.isVerified || (selectedStore as any).is_verified) && (
+                    <div className="absolute -bottom-1 -left-1 z-20" title="موثق رسمياً">
+                      <VerifiedBadge size={18} />
+                    </div>
+                  )}
                 </div>
                 
                 <div className="flex-1 text-center md:text-right mt-1 md:mt-0 md:mr-3 w-full">
@@ -1380,7 +1584,7 @@ export const CustomerApp: React.FC = () => {
                     <div className="flex flex-wrap items-center gap-3 justify-center md:justify-start text-[9px] sm:text-[10px] font-bold text-slate-400">
                       <div className="flex items-center gap-1">
                         <MapPin size={11} className="text-[#9952FF]" />
-                        <span>{selectedStore.province}{selectedStore.showArea !== false ? ` • ${selectedStore.area}` : ''}</span>
+                        <span>{selectedStore.province}</span>
                       </div>
                       {selectedStore.showPhone !== false && (
                         <div className="flex items-center gap-1">
@@ -1389,33 +1593,6 @@ export const CustomerApp: React.FC = () => {
                         </div>
                       )}
                     </div>
-                    {selectedStore.showLandmark !== false && selectedStore.landmark && (
-                      <div className="text-[9px] sm:text-[10px] text-slate-500 font-bold text-center md:text-right w-full">
-                        أقرب نقطة دالة: {selectedStore.landmark}
-                      </div>
-                    )}
-                    {selectedStore.showMap !== false && selectedStore.lat && selectedStore.lng && (
-                      <div className="flex items-center gap-2 mt-0.5 justify-center md:justify-start w-full">
-                        <a 
-                          href={`https://www.google.com/maps/search/?api=1&query=${selectedStore.lat},${selectedStore.lng}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-1 px-2.5 py-1 bg-white text-slate-600 rounded-lg text-[9px] font-black border border-slate-200 hover:bg-slate-50 shadow-2xs transition-colors"
-                        >
-                          <MapPin size={11} className="text-red-500" />
-                          Google Maps
-                        </a>
-                        <a 
-                          href={`https://waze.com/ul?ll=${selectedStore.lat},${selectedStore.lng}&navigate=yes`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-1 px-2.5 py-1 bg-[#f2fcfed9] text-[#00a9e0] rounded-lg text-[9px] font-black border border-[#c2f2ff] hover:bg-[#e6faff] shadow-2xs transition-colors"
-                        >
-                          <Car size={11} />
-                          Waze
-                        </a>
-                      </div>
-                    )}
                   </div>
                   
                   <div className="flex items-center gap-2 mt-2 justify-center md:justify-start">
@@ -1680,7 +1857,7 @@ export const CustomerApp: React.FC = () => {
                           {review.message && (
                             <p className="text-slate-600 text-sm">{review.message}</p>
                           )}
-                          <p className="text-[10px] text-slate-400 mt-2">{new Date(review.createdAt).toLocaleDateString('ar-IQ')}</p>
+                          <p className="text-[10px] text-slate-400 mt-2">{formatSafeDateTimeString(review.createdAt, 'ar-IQ', { dateStyle: 'short', timeStyle: 'short' })}</p>
                         </div>
                       ))}
                     </div>
@@ -1695,7 +1872,8 @@ export const CustomerApp: React.FC = () => {
         ) : (
           <>
             {/* الهيدر العلوي - تصميم عصري */}
-            <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-slate-200/60 transition-all">
+            {activeTab !== 'reels' && (
+              <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-slate-200/60 transition-all">
               <div className="max-w-4xl mx-auto px-4 h-16 flex justify-between items-center text-[#4D2980]">
                 
                 <div className="flex items-center gap-3">
@@ -1752,6 +1930,7 @@ export const CustomerApp: React.FC = () => {
                 </div>
               </div>
             </header>
+            )}
 
         {/* قائمة الإشعارات المنسدلة - تصميم جديد */}
         {showNotifications && (
@@ -1819,7 +1998,7 @@ export const CustomerApp: React.FC = () => {
                           <div className="flex items-center gap-1.5 mt-2 opacity-60">
                             <Clock size={10} />
                             <span className="text-[9px] font-bold">
-                              {new Date(n.createdAt).toLocaleTimeString('ar-IQ', { hour: '2-digit', minute: '2-digit' })}
+                              {formatSafeDateTimeString(n.createdAt, 'ar-IQ', { dateStyle: 'short', timeStyle: 'short' })}
                             </span>
                           </div>
                         </div>
@@ -1848,7 +2027,7 @@ export const CustomerApp: React.FC = () => {
         )}
 
         {/* التاب المفتوح حالياً */}
-        <main className="flex-1 p-3 sm:p-5 max-w-4xl mx-auto w-full min-w-0 overflow-x-hidden">
+        <main className={activeTab === 'reels' ? "w-full min-h-screen bg-black" : "flex-1 p-3 sm:p-5 max-w-4xl mx-auto w-full min-w-0 overflow-x-hidden"}>
           
           {/* تاب المتاجر والتصفح */}
           {activeTab === 'stores' && (
@@ -1910,6 +2089,135 @@ export const CustomerApp: React.FC = () => {
                 </div>
               )}
 
+              {/* عروض فلاش سيلز */}
+              {(() => {
+                const activeFlashSales = flashSales.filter(f => f.status === 'active' || (f.status === 'upcoming' && new Date() >= new Date(f.startTime) && new Date() < new Date(f.endTime)));
+                if (activeFlashSales.length === 0) return null;
+                return (
+                  <div className="bg-gradient-to-l from-red-600 to-rose-500 rounded-[2rem] p-5 shadow-lg relative overflow-hidden group mx-1 mb-4 text-white">
+                    <div className="absolute -top-10 -right-10 text-white/10 group-hover:scale-110 transition-transform duration-500">
+                      <Zap size={140} />
+                    </div>
+                    <div className="relative z-10">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-2">
+                          <div className="p-2 bg-white/20 backdrop-blur-sm rounded-xl">
+                            <Zap size={18} fill="currentColor" />
+                          </div>
+                          <h3 className="font-black text-white text-xs sm:text-sm tracking-tight drop-shadow-sm">فلاش سيلز - خصومات لفترة محدودة!</h3>
+                        </div>
+                      </div>
+                      <div className="flex overflow-x-auto gap-3 pb-2 scrollbar-thin">
+                        {activeFlashSales.map(fs => {
+                          const targetStore = stores.find(s => s.id === fs.itemStoreId);
+                          return (
+                            <div 
+                              key={fs.id} 
+                              onClick={() => { if(targetStore && !targetStore.isBanned) setSelectedStore(targetStore); }}
+                              className="w-40 shrink-0 bg-white/10 backdrop-blur-md rounded-2xl p-3 border border-white/20 cursor-pointer hover:bg-white/20 transition-all text-center"
+                            >
+                                <span className="block text-[10px] font-bold text-rose-100 truncate mb-1">{fs.title}</span>
+                                {targetStore && (
+                                  <div className="flex items-center gap-2 justify-center mt-2 bg-white rounded-xl p-1.5 shadow-sm text-slate-800">
+                                    <img src={targetStore.logo} className="w-6 h-6 rounded-lg shrink-0 object-cover" alt="" />
+                                    <span className="text-[10px] font-black truncate">{targetStore.shopName}</span>
+                                  </div>
+                                )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* قسم المتاجر الموثقة - يظهر مباشرة تحت الإعلان المميز */}
+              <div className="bg-white rounded-[2rem] border border-slate-100 p-5 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group mx-1">
+                <div className="absolute top-0 left-0 w-24 h-24 bg-blue-500/5 rounded-full -ml-8 -mt-8"></div>
+                <div className="relative z-10">
+                  <div className="flex items-center justify-between mb-5">
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
+                        <VerifiedBadge size={18} />
+                      </div>
+                      <h3 className="font-black text-[#4D2980] text-xs tracking-tight">المتاجر الموثقة</h3>
+                    </div>
+                    <button 
+                      onClick={() => setShowFullVerified(!showFullVerified)}
+                      className="text-[10px] font-black text-[#9952FF] hover:text-[#4D2980] transition"
+                    >
+                      {showFullVerified ? 'أقل' : 'الكل'}
+                    </button>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+                    {uniqueStores.filter(s => (s.isVerified || (s as any).is_verified) && s.status === 'active').length === 0 ? (
+                      <div className="col-span-2 sm:col-span-4 py-8 text-center text-slate-400 text-xs font-bold italic">لا توجد متاجر موثقة حالياً</div>
+                    ) : (
+                      uniqueStores.filter(s => (s.isVerified || (s as any).is_verified) && s.status === 'active')
+                       .slice(0, showFullVerified ? undefined : 2)
+                       .map(store => {
+                        const categoryLabel = CATEGORY_SHORT_NAMES[store.category || ''] || store.category || 'عام';
+                        return (
+                          <div 
+                            key={`verif-${store.id}`}
+                            onClick={() => setSelectedStore(store)}
+                            className="w-full bg-white p-3 sm:p-4 rounded-[2rem] border border-slate-100 hover:border-[#9952FF]/30 shadow-2xs hover:shadow-md transition-all duration-300 hover:scale-[1.04] active:scale-95 text-center flex flex-col items-center gap-2.5 cursor-pointer group"
+                          >
+                            {/* شعار المتجر مربع */}
+                            <div className="relative w-full aspect-square rounded-2xl border border-slate-100 overflow-hidden bg-slate-50 flex items-center justify-center shadow-2xs shrink-0">
+                              <img 
+                                src={store.logo || undefined} 
+                                alt={store.shopName} 
+                                className="w-full h-full object-cover group-hover:scale-110 transition duration-500" 
+                                referrerPolicy="no-referrer"
+                              />
+                              <div className="absolute bottom-2 left-2 z-10 animate-fade-in" title="موثق رسمياً">
+                                <VerifiedBadge size={20} />
+                              </div>
+                              {adminSettings.featuredStoreIds?.includes(store.id) && (
+                                <div className="absolute top-2 right-2 bg-gradient-to-tr from-amber-400 to-amber-500 text-white p-1 rounded-md shadow-xs z-10 animate-fade-in" title="متجر مميز">
+                                  <Zap size={10} fill="currentColor" />
+                                </div>
+                              )}
+                            </div>
+                            
+                            {/* البيانات تحت الشعار */}
+                            <div className="w-full flex flex-col items-center gap-1">
+                              {/* اسم المتجر وبجانبه علامة التوثيق */}
+                              <div className="w-full flex items-center justify-center gap-1 leading-none">
+                                <span className="font-tajawal text-xs sm:text-[13.5px] font-black text-[#4D2980] select-none text-center block px-0.5 group-hover:text-[#9952FF] transition-colors" title={store.shopName}>
+                                  {store.shopName}
+                                </span>
+                              </div>
+                              
+                              {/* التقييم */}
+                              <div className="flex items-center gap-1 justify-center">
+                                <div className="flex items-center gap-0.5 text-amber-500 bg-amber-50 px-1.5 py-[2px] rounded-md shrink-0 border border-amber-100/30">
+                                  <Sparkles size={9} className="fill-amber-400 text-amber-500" />
+                                  <span className="text-[9.5px] font-bold">{getStoreRating(store.id, store.rating)}</span>
+                                </div>
+                              </div>
+                              
+                              {/* المحافظة */}
+                              <span className="font-tajawal text-[9px] sm:text-[10px] font-bold text-slate-400 leading-[1.1] truncate text-center w-full select-none" title={store.province}>
+                                📍 {store.province}
+                              </span>
+                              
+                              {/* فئة المتجر */}
+                              <span className="font-tajawal text-[8px] sm:text-[9px] font-extrabold text-[#9952FF] bg-[#9952FF]/5 px-2 py-0.5 rounded-full leading-[1.1] truncate text-center w-full select-none" title={categoryLabel}>
+                                {categoryLabel}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              </div>
+
               {/* الفعاليات المركزية */}
               {flashSales.some(f => (f.status === 'active' || (f.status === 'upcoming' && new Date() >= new Date(f.startTime) && new Date() < new Date(f.endTime)))) && (
                 <div className="space-y-4">
@@ -1930,7 +2238,7 @@ export const CustomerApp: React.FC = () => {
                               </div>
                               <div className="bg-[#4D2980]/20 backdrop-blur px-4 py-2 rounded-2xl text-center min-w-[100px]">
                                 <span className="text-[10px] font-bold block opacity-80 uppercase tracking-widest mb-1">ينتهي في</span>
-                                <span className="font-mono font-black text-sm tracking-wider select-none">{new Date(sale.endTime).toLocaleDateString('en-GB')} {new Date(sale.endTime).toLocaleTimeString('en-US', {hour: '2-digit', minute:'2-digit'})}</span>
+                                <span className="font-mono font-black text-sm tracking-wider select-none">{formatSafeDate(sale.endTime, 'en-GB')} {formatSafeTimeString(sale.endTime, 'en-US', {hour: '2-digit', minute:'2-digit'})}</span>
                               </div>
                            </div>
 
@@ -1957,7 +2265,7 @@ export const CustomerApp: React.FC = () => {
                                           <span className="font-black text-white text-sm bg-rose-500 px-2 py-0.5 rounded-lg shadow-sm">{req.promotionalPrice.toLocaleString()} <span className="text-[8px]">د.ع</span></span>
                                           <del className="text-[10px] opacity-70">{p.price.toLocaleString()}</del>
                                        </div>
-                                       <p className="text-[9px] font-bold opacity-80 mt-2 truncate bg-[#4D2980]/10 px-2 py-1 rounded-md">{store.shopName}</p>
+                                       <p className="text-[9px] font-bold opacity-80 mt-2 bg-[#4D2980]/10 px-2 py-1 rounded-md text-center">{store.shopName}</p>
                                      </div>
                                  )
                               })}
@@ -1990,31 +2298,68 @@ export const CustomerApp: React.FC = () => {
                       </button>
                     </div>
                     
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-2 gap-3 sm:gap-4">
                       {(showFullFeatured 
                         ? uniqueStores.filter(s => adminSettings.featuredStoreIds?.includes(s.id))
-                        : uniqueStores.filter(s => adminSettings.featuredStoreIds?.includes(s.id)).slice(0, 4)
-                      ).map(store => (
-                        <div 
-                          key={`feat-${store.id}`}
-                          onClick={() => setSelectedStore(store)}
-                          className="flex flex-col items-center gap-2 cursor-pointer group/item"
-                        >
-                          <div className="relative">
-                            <img src={store.logo || undefined} className="w-12 h-12 rounded-2xl object-cover ring-4 ring-slate-50 group-hover/item:ring-amber-200 transition-all shadow-sm" />
-                            <div className="absolute -bottom-1 -right-1 bg-amber-400 text-white p-0.5 rounded-md shadow-sm">
-                              <Zap size={10} fill="currentColor" />
+                        : uniqueStores.filter(s => adminSettings.featuredStoreIds?.includes(s.id)).slice(0, 2)
+                      ).map(store => {
+                        const categoryLabel = CATEGORY_SHORT_NAMES[store.category || ''] || store.category || 'عام';
+                        return (
+                          <div 
+                            key={`feat-${store.id}`}
+                            onClick={() => setSelectedStore(store)}
+                            className="w-full bg-white p-3 sm:p-4 rounded-[2rem] border border-slate-100 hover:border-[#9952FF]/30 shadow-2xs hover:shadow-md transition-all duration-300 hover:scale-[1.04] active:scale-95 text-center flex flex-col items-center gap-2.5 cursor-pointer group"
+                          >
+                            {/* شعار المتجر مربع */}
+                            <div className="relative w-full aspect-square rounded-2xl border border-slate-100 overflow-hidden bg-slate-50 flex items-center justify-center shadow-2xs shrink-0">
+                              <img 
+                                src={store.logo || undefined} 
+                                alt={store.shopName} 
+                                className="w-full h-full object-cover group-hover:scale-110 transition duration-500" 
+                                referrerPolicy="no-referrer"
+                              />
+                              {(store.isVerified || (store as any).is_verified) && (
+                                <div className="absolute bottom-2 left-2 z-10 animate-fade-in" title="موثق رسمياً">
+                                  <VerifiedBadge size={20} />
+                                </div>
+                              )}
+                              {adminSettings.featuredStoreIds?.includes(store.id) && (
+                                <div className="absolute top-2 right-2 bg-gradient-to-tr from-amber-400 to-amber-500 text-white p-1 rounded-md shadow-sm z-10 animate-fade-in" title="متجر مميز">
+                                  <Zap size={10} fill="currentColor" />
+                                </div>
+                              )}
+                            </div>
+                            
+                            {/* البيانات تحت الشعار */}
+                            <div className="w-full flex flex-col items-center gap-1">
+                              {/* اسم المتجر وبجانبه علامة التوثيق */}
+                              <div className="w-full flex items-center justify-center gap-1 leading-none">
+                                <span className="font-tajawal text-xs sm:text-[13.5px] font-black text-[#4D2980] select-none text-center block px-0.5 group-hover:text-[#9952FF] transition-colors" title={store.shopName}>
+                                  {store.shopName}
+                                </span>
+                              </div>
+                              
+                              {/* التقييم */}
+                              <div className="flex items-center gap-1 justify-center">
+                                <div className="flex items-center gap-0.5 text-amber-500 bg-amber-50 px-1.5 py-[2px] rounded-md shrink-0 border border-amber-100/30">
+                                  <Sparkles size={9} className="fill-amber-400 text-amber-500" />
+                                  <span className="text-[9.5px] font-bold">{getStoreRating(store.id, store.rating)}</span>
+                                </div>
+                              </div>
+                              
+                              {/* المحافظة */}
+                              <span className="font-tajawal text-[9px] sm:text-[10px] font-bold text-slate-400 leading-[1.1] truncate text-center w-full select-none" title={store.province}>
+                                📍 {store.province}
+                              </span>
+                              
+                              {/* فئة المتجر */}
+                              <span className="font-tajawal text-[8px] sm:text-[9px] font-extrabold text-[#9952FF] bg-[#9952FF]/5 px-2 py-0.5 rounded-full leading-[1.1] truncate text-center w-full select-none" title={categoryLabel}>
+                                {categoryLabel}
+                              </span>
                             </div>
                           </div>
-                          <div className="flex items-center gap-1 w-full justify-center text-center mt-1">
-                            <span className="text-[10px] font-black text-slate-700 truncate">{store.shopName}</span>
-                            <div className="flex items-center gap-0.5 text-amber-500 bg-amber-50 px-1 py-0.5 rounded-md">
-                              <Sparkles size={8} />
-                              <span className="text-[8px] font-black">{getStoreRating(store.id, store.rating)}</span>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
@@ -2038,72 +2383,123 @@ export const CustomerApp: React.FC = () => {
                       </button>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3 mt-auto">
-                      {(() => {
-                        const coords = userCoords || (currentCustomer?.lat && currentCustomer?.lng ? { lat: currentCustomer.lat, lng: currentCustomer.lng } : null);
-
-                        const baseStores = (() => {
-                          if (adminSettings.enableAutoNearby) {
-                            // الفرز التلقائي حسب المسافة
-                            const filtered = [...uniqueStores].filter(s => s.status === 'active');
-                            if (coords) {
-                              return [...filtered].sort((a, b) => {
-                                const distA = a.showMap !== false && a.lat && a.lng ? calculateDistance(coords.lat, coords.lng, a.lat, a.lng) : Infinity;
-                                const distB = b.showMap !== false && b.lat && b.lng ? calculateDistance(coords.lat, coords.lng, b.lat, b.lng) : Infinity;
-                                return distA - distB;
-                              });
-                            } else {
-                              return filtered.filter(s => s.province === (currentCustomer?.province || 'بغداد'));
-                            }
-                          } else {
-                            // التحكم اليدوي من الإدارة
-                            const nearbyIds = adminSettings.nearbyStoreIds || [];
-                            if (nearbyIds.length > 0) {
-                              return uniqueStores.filter(s => nearbyIds.includes(s.id) && s.status === 'active');
-                            } else {
-                              return uniqueStores.filter(s => s.province === (currentCustomer?.province || 'بغداد') && s.status === 'active');
-                            }
-                          }
-                        })();
-
-                        const displayStores = showFullNearby ? baseStores : baseStores.slice(0, 4);
-
-                        if (displayStores.length === 0) return <div className="col-span-2 py-4 text-center text-[#cba8ff] text-[10px] font-bold italic">لا توجد متاجر حالياً</div>;
-
-                        return displayStores.map(store => {
+                    <div className="grid grid-cols-2 gap-3 sm:gap-4 mt-auto">
+                    {uniqueStores.filter(s => s.status === 'active').length === 0 ? (
+                      <div className="col-span-2 py-4 text-center text-[#cba8ff] text-[10px] font-bold italic">لا توجد متاجر حالياً</div>
+                    ) : (
+                      uniqueStores.filter(s => s.status === 'active')
+                      // Quick inline filter for nearby logic to avoid breaking linter
+                      .filter(s => {
+                         if (!adminSettings.enableAutoNearby) {
+                           const nearbyIds = adminSettings.nearbyStoreIds || [];
+                           if (nearbyIds.length > 0) return nearbyIds.includes(s.id);
+                           return s.province === (currentCustomer?.province || 'بغداد');
+                         }
+                         if (userCoords || (currentCustomer?.lat && currentCustomer?.lng)) return true;
+                         return s.province === (currentCustomer?.province || 'بغداد');
+                      })
+                      .sort((a, b) => {
+                         if (!adminSettings.enableAutoNearby) return 0;
+                         const coords = userCoords || (currentCustomer?.lat && currentCustomer?.lng ? { lat: currentCustomer.lat, lng: currentCustomer.lng } : null);
+                         if (!coords) return 0;
+                         const distA = a.showMap !== false && a.lat && a.lng ? calculateDistance(coords.lat, coords.lng, a.lat, a.lng) : Infinity;
+                         const distB = b.showMap !== false && b.lat && b.lng ? calculateDistance(coords.lat, coords.lng, b.lat, b.lng) : Infinity;
+                         return distA - distB;
+                      })
+                      .slice(0, showFullNearby ? undefined : 2)
+                      .map(store => {
+                          const coords = userCoords || (currentCustomer?.lat && currentCustomer?.lng ? { lat: currentCustomer.lat, lng: currentCustomer.lng } : null);
                           const dist = (store.showMap !== false && coords && store.lat && store.lng) 
                             ? calculateDistance(coords.lat, coords.lng, store.lat, store.lng).toFixed(1) 
                             : null;
+                          const categoryLabel = CATEGORY_SHORT_NAMES[store.category || ''] || store.category || 'عام';
 
                           return (
                             <div 
                               key={`near-${store.id}`}
                               onClick={() => setSelectedStore(store)}
-                              className="flex flex-col items-center gap-2 cursor-pointer group/item bg-white/5 p-2 rounded-2xl hover:bg-white/10 transition-all border border-white/5"
+                              className="w-full bg-white p-3 sm:p-4 rounded-[2rem] border border-slate-100 hover:border-[#9952FF]/30 shadow-2xs hover:shadow-md transition-all duration-300 hover:scale-[1.04] active:scale-95 text-center flex flex-col items-center gap-2.5 cursor-pointer group"
                             >
-                              <div className="relative">
-                                <img src={store.logo || undefined} className="w-12 h-12 rounded-2xl object-cover ring-4 ring-white/10 group-hover/item:ring-white/30 transition-all shadow-lg" />
+                              {/* شعار المتجر مربع */}
+                              <div className="relative w-full aspect-square rounded-2xl border border-slate-100 overflow-hidden bg-slate-50 flex items-center justify-center shadow-2xs shrink-0">
+                                <img 
+                                  src={store.logo || undefined} 
+                                  alt={store.shopName} 
+                                  className="w-full h-full object-cover group-hover:scale-110 transition duration-500" 
+                                  referrerPolicy="no-referrer"
+                                />
+                                {(store.isVerified || (store as any).is_verified) && (
+                                  <div className="absolute bottom-2 left-2 z-10 animate-fade-in" title="موثق رسمياً">
+                                    <VerifiedBadge size={20} />
+                                  </div>
+                                )}
                                 {dist && (
-                                  <div className="absolute -bottom-1 -left-1 bg-white px-1.5 py-0.5 rounded-lg shadow-sm border border-[#e9daff] flex items-center gap-0.5">
-                                    <span className="text-[7px] font-black text-[#9952FF] leading-none">{dist}كم</span>
+                                  <div className="absolute top-2 right-2 bg-[#9952FF] text-white px-1.5 py-0.5 rounded-md shadow-sm border border-[#e9daff]">
+                                    <span className="text-[8px] sm:text-[9.5px] font-black leading-none">{dist}كم</span>
+                                  </div>
+                                )}
+                                {adminSettings.featuredStoreIds?.includes(store.id) && (
+                                  <div className={`absolute top-2 ${dist ? 'left-2' : 'right-2'} bg-gradient-to-tr from-amber-400 to-amber-500 text-white p-1 rounded-md shadow-sm z-10 animate-fade-in`} title="متجر مميز">
+                                    <Zap size={10} fill="currentColor" />
                                   </div>
                                 )}
                               </div>
-                              <div className="flex items-center gap-1 w-full justify-center text-center mt-1">
-                                <span className="text-[10px] font-black text-white truncate">{store.shopName}</span>
-                                <div className="flex items-center gap-0.5 text-amber-300">
-                                  <Sparkles size={8} />
-                                  <span className="text-[8px] font-black">{getStoreRating(store.id, store.rating)}</span>
+                              
+                              {/* البيانات تحت الشعار */}
+                              <div className="w-full flex flex-col items-center gap-1">
+                                {/* اسم المتجر وبجانبه علامة التوثيق */}
+                                <div className="w-full flex items-center justify-center gap-1 leading-none">
+                                  <span className="font-tajawal text-xs sm:text-[13.5px] font-black text-[#4D2980] select-none text-center block px-0.5 group-hover:text-[#9952FF] transition-colors" title={store.shopName}>
+                                    {store.shopName}
+                                  </span>
                                 </div>
+                                
+                                {/* التقييم */}
+                                <div className="flex items-center gap-1 justify-center">
+                                  <div className="flex items-center gap-0.5 text-amber-500 bg-amber-50 px-1.5 py-[2px] rounded-md shrink-0 border border-amber-100/30">
+                                    <Sparkles size={9} className="fill-amber-400 text-amber-500" />
+                                    <span className="text-[9.5px] font-bold">{getStoreRating(store.id, store.rating)}</span>
+                                  </div>
+                                </div>
+                                
+                                {/* المحافظة */}
+                                <span className="font-tajawal text-[9px] sm:text-[10px] font-bold text-slate-400 leading-[1.1] truncate text-center w-full select-none" title={store.province}>
+                                  📍 {store.province}
+                                </span>
+                                
+                                {/* فئة المتجر */}
+                                <span className="font-tajawal text-[8px] sm:text-[9px] font-extrabold text-[#9952FF] bg-[#9952FF]/5 px-2 py-0.5 rounded-full leading-[1.1] truncate text-center w-full select-none" title={categoryLabel}>
+                                  {categoryLabel}
+                                </span>
                               </div>
                             </div>
                           );
-                        });
-                      })()}
+                        })
+                    )}
                     </div>
                   </div>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* تاب مقاطع الفيديو التسوقية الجديد */}
+          {activeTab === 'reels' && (
+            <div className="w-full h-full animate-fade-in bg-black">
+              <ReelsFeed 
+                onBack={() => handleTabChange('stores')}
+                onShowCart={() => setShowCart(true)}
+                cartCount={cart.reduce((sum, item) => sum + item.quantity, 0)}
+                onAddToCart={(p) => addToCart(p, 1)}
+                currentCustomer={currentCustomer}
+                onShareReel={(reel) => openShareModal('reel', reel)}
+                onVisitStore={(storeId) => {
+                  const foundStore = stores.find(s => s.id === storeId);
+                  if (foundStore) {
+                    setSelectedStore(foundStore);
+                  }
+                }}
+              />
             </div>
           )}
 
@@ -2236,54 +2632,95 @@ export const CustomerApp: React.FC = () => {
                 </div>
 
                 {filteredStores.length === 0 ? (
-                  <div className="py-20 text-center bg-white rounded-[2.5rem] border border-slate-100 shadow-sm">
-                    <div className="w-24 h-24 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-6">
-                       <Search size={40} className="text-slate-200" />
+                  stores.length === 0 ? (
+                    <div className="py-16 text-center bg-white rounded-[2.5rem] border border-slate-100 shadow-sm p-6 sm:p-12 animate-fade-in">
+                      <div className="w-20 h-20 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                         <Zap size={36} className="text-amber-500" />
+                      </div>
+                      <p className="text-[#4D2980] font-black text-lg">التطبيق فارغ حالياً مابي بيانات!</p>
+                      <p className="text-slate-400 text-xs mt-2 font-bold max-w-md mx-auto leading-relaxed text-center px-4">
+                        هذه أول مرة يتم فيها تشغيل التطبيق وقاعدة بيانات Firebase الخاصة بك فارغة تماماً. يمكنك بكبسة زر واحدة من توليد بيانات واقعية متكاملة لتجربة التطبيق فوراً.
+                      </p>
+                      <button 
+                        onClick={async () => {
+                          const conf = window.confirm('هل تود توليد متاجر ومنتجات تجريبية واقعية بالعراق والترويج لها بالكامل؟');
+                          if (!conf) return;
+                          try {
+                            const res = await seedDatabase();
+                            alert(res.message);
+                          } catch (err: any) {
+                            alert('فشل التوليد: ' + err.message);
+                          }
+                        }}
+                        className="mt-6 px-6 py-3 bg-[#9952FF] hover:bg-[#803ce3] text-white text-xs font-black rounded-full shadow-lg transition duration-300 transform active:scale-95 flex items-center gap-2 mx-auto cursor-pointer"
+                      >
+                        <Zap size={14} className="fill-current" />
+                        توليد قاعدة بيانات تجريبية بالكامل
+                      </button>
                     </div>
-                    <p className="text-slate-500 font-black">عذراً، لم نجد نتائج!</p>
-                    <p className="text-slate-400 text-[10px] mt-2 font-bold px-10 leading-relaxed text-center">جرّب البحث بكلمات أخرى أو تغيير تصنيف المتجر والمحافظة</p>
-                  </div>
+                  ) : (
+                    <div className="py-20 text-center bg-white rounded-[2.5rem] border border-slate-100 shadow-sm">
+                      <div className="w-24 h-24 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                         <Search size={40} className="text-slate-200" />
+                      </div>
+                      <p className="text-slate-500 font-black">عذراً، لم نجد نتائج!</p>
+                      <p className="text-slate-400 text-[10px] mt-2 font-bold px-10 leading-relaxed text-center">جرّب البحث بكلمات أخرى أو تغيير تصنيف المتجر والمحافظة</p>
+                    </div>
+                  )
                 ) : (
-                  <div className="grid grid-cols-2 min-[420px]:grid-cols-3 min-[540px]:grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-8 xl:grid-cols-8 gap-3 sm:gap-4.5 px-1 w-full justify-items-center">
+                  <div className="grid grid-cols-2 min-[400px]:grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-4 sm:gap-6 px-1 w-full justify-items-center">
                     {filteredStores.map(store => {
                       const categoryLabel = CATEGORY_SHORT_NAMES[store.category || ''] || store.category || 'عام';
                       return (
                         <div 
                           key={store.id} 
                           onClick={() => setSelectedStore(store)}
-                          className="w-full flex flex-col items-center gap-1.5 cursor-pointer transition-all duration-300 hover:scale-105 active:scale-95 text-center"
+                          className="w-full bg-white p-3.5 sm:p-5 rounded-[2rem] border border-slate-100 hover:border-[#9952FF]/30 shadow-2xs hover:shadow-md transition-all duration-300 hover:scale-[1.04] active:scale-95 text-center flex flex-col items-center gap-3 cursor-pointer group"
                         >
                           {/* شعار المتجر مربع */}
-                          <div className="relative w-full max-w-[85px] aspect-square rounded-xl border border-slate-150 overflow-hidden bg-slate-50 flex items-center justify-center shadow-2xs shrink-0">
+                          <div className="relative w-full aspect-square rounded-2xl border border-slate-100 overflow-hidden bg-slate-50 flex items-center justify-center shadow-2xs shrink-0 max-w-[130px]">
                             <img 
                               src={store.logo || undefined} 
                               alt={store.shopName} 
-                              className="w-full h-full object-cover" 
+                              className="w-full h-full object-cover group-hover:scale-110 transition duration-500" 
                               referrerPolicy="no-referrer"
                             />
-                            <div className="absolute bottom-1.5 left-1.5 w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full border border-white bg-emerald-500"></div>
+                            {(store.isVerified || (store as any).is_verified) && (
+                              <div className="absolute bottom-2 left-2 z-10 animate-fade-in" title="موثق رسمياً">
+                                <VerifiedBadge size={22} />
+                              </div>
+                            )}
+                            {adminSettings.featuredStoreIds?.includes(store.id) && (
+                              <div className="absolute top-2 right-2 bg-gradient-to-tr from-amber-400 to-amber-500 text-white p-1 rounded-md shadow-xs z-10 animate-fade-in" title="متجر مميز">
+                                <Zap size={10} fill="currentColor" />
+                              </div>
+                            )}
                           </div>
                           
                           {/* البيانات تحت الشعار */}
-                          <div className="w-full flex flex-col items-center gap-[0.5px]">
-                            {/* اسم المتجر ومعه التقييم */}
-                            <div className="flex items-center gap-1 w-full justify-center text-center">
-                              <span className="font-tajawal text-[9px] min-[360px]:text-[10px] sm:text-[11.5px] font-black text-[#4D2980] leading-[1.2] truncate select-none" title={store.shopName}>
+                          <div className="w-full flex flex-col items-center gap-1">
+                            {/* اسم المتجر وبجانبه علامة التوثيق */}
+                            <div className="w-full flex items-center justify-center gap-1.5 leading-none">
+                              <span className="font-tajawal text-xs sm:text-[13.5px] font-black text-[#4D2980] select-none text-center block px-0.5 group-hover:text-[#9952FF] transition-colors" title={store.shopName}>
                                 {store.shopName}
                               </span>
-                              <div className="flex items-center gap-0.5 text-amber-500">
-                                <Sparkles size={8} />
-                                <span className="text-[8px] font-black">{getStoreRating(store.id, store.rating)}</span>
+                            </div>
+                            
+                            {/* التقييم */}
+                            <div className="flex items-center gap-1 justify-center">
+                              <div className="flex items-center gap-0.5 text-amber-500 bg-amber-50 px-1.5 py-[2px] rounded-md shrink-0 border border-amber-100/30">
+                                <Sparkles size={9} className="fill-amber-400 text-amber-500" />
+                                <span className="text-[9.5px] font-bold">{getStoreRating(store.id, store.rating)}</span>
                               </div>
                             </div>
                             
                             {/* المحافظة */}
-                            <span className="font-tajawal text-[7.5px] min-[360px]:text-[8.5px] sm:text-[9.5px] font-bold text-slate-400 leading-[1.1] truncate text-center w-full select-none" title={store.province}>
-                              {store.province}
+                            <span className="font-tajawal text-[9px] sm:text-[10px] font-bold text-slate-400 leading-[1.1] truncate text-center w-full select-none" title={store.province}>
+                              📍 {store.province}
                             </span>
                             
                             {/* فئة المتجر */}
-                            <span className="font-tajawal text-[7px] min-[360px]:text-[8px] sm:text-[9px] font-extrabold text-[#9952FF] leading-[1.1] truncate text-center w-full select-none" title={categoryLabel}>
+                            <span className="font-tajawal text-[8px] sm:text-[9px] font-extrabold text-[#9952FF] bg-[#9952FF]/5 px-2 py-0.5 rounded-full leading-[1.1] truncate text-center w-full select-none" title={categoryLabel}>
                               {categoryLabel}
                             </span>
                           </div>
@@ -2440,7 +2877,7 @@ export const CustomerApp: React.FC = () => {
                             <span className="shrink-0">المنتجات ({order.items.length})</span>
                             <div className="flex items-center gap-1 min-w-0 truncate">
                                <Calendar size={12} className="shrink-0" />
-                               <span className="truncate">{new Date(order.createdAt).toLocaleDateString('ar-IQ')}</span>
+                               <span className="truncate">{formatSafeDateTimeString(order.createdAt, 'ar-IQ', { dateStyle: 'short', timeStyle: 'short' })}</span>
                             </div>
                          </div>
                          <div className="grid gap-2 max-h-[120px] overflow-y-auto no-scrollbar">
@@ -2459,14 +2896,37 @@ export const CustomerApp: React.FC = () => {
                            ))}
                          </div>
                          
+                         {/* زر إلغاء الطلب الموقت */}
+                         <CancelOrderButton order={order} onCancelClick={(o) => setOrderToCancel(o)} />
+
                          {/* تفاصيل التوصيل */}
-                         <div className="pt-3 border-t border-slate-50 flex items-center gap-2 min-w-0 w-full">
-                            <div className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg shrink-0">
-                               <MapPin size={12} />
+                         <div className="pt-3 border-t border-slate-50 flex flex-col gap-2 min-w-0 w-full">
+                            <div className="flex items-center gap-2">
+                              <div className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg shrink-0">
+                                 <MapPin size={12} />
+                              </div>
+                              <span className="text-[11px] font-bold text-slate-500 whitespace-normal break-words flex-1" title={`عنوان التوصيل: ${order.customerProvince} - ${order.customerAddress}`}>
+                                 عنوان التوصيل: {order.customerProvince} - {order.customerAddress}
+                              </span>
                             </div>
-                            <span className="text-[11px] font-bold text-slate-500 truncate flex-1" title={`عنوان التوصيل: ${order.customerProvince} - ${order.customerAddress}`}>
-                               عنوان التوصيل: {order.customerProvince} - {order.customerAddress}
-                            </span>
+                            {adminSettings?.enableMaps !== false && (order as any).customerLat && (order as any).customerLng && (
+                              <div className="w-full h-24 rounded-xl overflow-hidden border border-slate-200 pointer-events-none relative mt-1 z-0">
+                                <MapContainer 
+                                  center={[(order as any).customerLat, (order as any).customerLng]} 
+                                  zoom={14} 
+                                  style={{ height: "100%", width: "100%", zIndex: 0 }}
+                                  zoomControl={false}
+                                  attributionControl={false}
+                                  dragging={false}
+                                  scrollWheelZoom={false}
+                                  doubleClickZoom={false}
+                                >
+                                  <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                                  <Marker position={[(order as any).customerLat, (order as any).customerLng]} />
+                                </MapContainer>
+                                <div className="absolute inset-0 z-[400] bg-transparent"></div>
+                              </div>
+                            )}
                          </div>
                       </div>
 
@@ -2623,9 +3083,11 @@ export const CustomerApp: React.FC = () => {
                      <h3 className="text-xs font-black text-slate-500 mr-2 uppercase tracking-widest">متجر المكافآت</h3>
                      <div className="grid gap-3">
                         {[
-                          { points: 100, discount: 5000, title: 'كوبون فضي للخصم' },
-                          { points: 200, discount: 12000, title: 'كوبون ذهبي للتوفير' },
-                          { points: 500, discount: 35000, title: 'كوبون ملكي محترف' },
+                          { points: 150, discount: 5000, title: 'كوبون برونزي للخصم المباشر' },
+                          { points: 300, discount: 10000, title: 'كوبون فضي للتوفير السريع' },
+                          { points: 450, discount: 15000, title: 'كوبون ذهبي مذهل للمشتريات' },
+                          { points: 600, discount: 20000, title: 'كوبون بلاتيني فخم ومميز' },
+                          { points: 750, discount: 25000, title: 'كوبون ماسي ملكي فائق التوفير' },
                         ].map((pkg, idx) => {
                           const canRedeem = (currentCustomer?.points || 0) >= pkg.points;
                           return (
@@ -2679,29 +3141,72 @@ export const CustomerApp: React.FC = () => {
                      </div>
                   </div>
 
-                  <div className="bg-slate-50 p-5 rounded-[2rem] border border-slate-100/50">
-                    <p className="text-[10px] font-black text-slate-500 mb-3 flex items-center gap-2">
-                       <Info size={14} className="text-[#9952FF]" />
-                       كيفية جمع النقاط؟
+                  <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100/50">
+                    <p className="text-[11px] font-black text-[#4D2980] mb-3 flex items-center gap-2">
+                       <Award size={16} className="text-[#9952FF]" />
+                       💰 كيف تكسب النقاط؟
                     </p>
-                    <ul className="space-y-2">
-                       <li className="flex items-center gap-2 text-[9px] font-bold text-slate-400">
-                          <div className="w-1 h-1 bg-[#b07aff] rounded-full"></div>
-                          ترقية المستوى تمنحك (100، 125، 200) نقطة هدية حسب المستوى. يتم تصفير المستوى شهرياً.
+                    <p className="text-[10px] text-slate-500 font-bold mb-4">
+                       يمكنك زيادة رصيد نقاطك بطرق سهلة وممتعة:
+                    </p>
+                    <ul className="space-y-4 text-slate-600">
+                       <li className="flex items-start gap-3 text-[10.5px] font-bold text-right">
+                          <span className="text-base select-none shrink-0 leading-none">🛒</span>
+                          <div>
+                            <span className="block text-[#4D2980] font-black text-right">عند كل طلب مكتمل</span>
+                            <span className="text-[9.5px] text-slate-400 font-medium text-right block">كل 1000 د.ع تنفقها تمنحك نقطة واحدة تلقائياً.</span>
+                          </div>
                        </li>
-                       <li className="flex items-center gap-2 text-[9px] font-bold text-slate-400">
-                          <div className="w-1 h-1 bg-[#b07aff] rounded-full"></div>
-                          تكسب نقاطاً تلقائياً عند كل طلب مكتمل (1000 د.ع = نقطة واحدة).
+                       <li className="flex items-start gap-3 text-[10.5px] font-bold text-right">
+                          <span className="text-base select-none shrink-0 leading-none">🆙</span>
+                          <div>
+                            <span className="block text-[#4D2980] font-black text-right">ترقية المستوى</span>
+                            <span className="text-[9.5px] text-slate-400 font-medium block text-right">احصل على نقاط هدية عند صعود مستواك:</span>
+                            <div className="grid grid-cols-3 gap-1.5 mt-2 bg-white/60 p-2 rounded-xl border border-slate-200/50 text-center">
+                              <div>
+                                <span className="text-[8.5px] font-black text-amber-600 block">المستوى الثاني</span>
+                                <span className="text-[9.5px] font-black text-[#4D2980]">+100 نقطة</span>
+                              </div>
+                              <div className="border-x border-slate-200">
+                                <span className="text-[8.5px] font-black text-slate-500 block">المستوى الثالث</span>
+                                <span className="text-[9.5px] font-black text-[#4D2980]">+125 نقطة</span>
+                              </div>
+                              <div>
+                                <span className="text-[8.5px] font-black text-[#9952FF] block">المستوى الرابع</span>
+                                <span className="text-[9.5px] font-black text-[#4D2980]">+150 نقطة</span>
+                              </div>
+                            </div>
+                            <span className="text-[8.5px] text-rose-500 font-extrabold mt-1.5 block text-right">💡 ملاحظة: يتم تصفير المستوى شهرياً.</span>
+                          </div>
                        </li>
-                       <li className="flex items-center gap-2 text-[9px] font-bold text-slate-400">
-                          <div className="w-1 h-1 bg-[#b07aff] rounded-full"></div>
-                          تكسب 5 نقاط هدية عند مشاركة رابط المتجر عبر الواتساب.
+                       <li className="flex items-start gap-3 text-[10.5px] font-bold text-right">
+                          <span className="text-base select-none shrink-0 leading-none">📱</span>
+                          <div>
+                            <span className="block text-[#4D2980] font-black text-right">مشاركة التطبيق</span>
+                            <span className="text-[9.5px] text-slate-400 font-medium text-right block">شارك رابط التطبيق عبر الواتساب واحصل على 5 نقاط هدية.</span>
+                          </div>
                        </li>
-                       <li className="flex items-center gap-2 text-[9px] font-bold text-slate-400">
-                          <div className="w-1 h-1 bg-[#b07aff] rounded-full"></div>
-                          تكسب 20 نقطة إضافية عند تقييم المتجر بعد إكمال طلبك.
+                       <li className="flex items-start gap-3 text-[10.5px] font-bold text-right">
+                          <span className="text-base select-none shrink-0 leading-none">⭐</span>
+                          <div>
+                            <span className="block text-[#4D2980] font-black text-right">تقييم المتجر</span>
+                            <span className="text-[9.5px] text-slate-400 font-medium text-right block">شاركنا رأيك وقيّمنا لتحصل على 5 نقاط إضافية.</span>
+                          </div>
                        </li>
                     </ul>
+                    
+                    {/* القاعدة الذهبية */}
+                    <div className="mt-5 pt-4 border-t border-dashed border-slate-200">
+                      <div className="bg-amber-50 rounded-2xl p-4 border border-amber-100 flex items-start gap-2.5">
+                        <span className="text-lg leading-none shrink-0">👑</span>
+                        <div>
+                          <h4 className="font-black text-amber-800 text-[11px] mb-0.5 text-right">قاعدة ذهبية</h4>
+                          <p className="text-[10px] font-black text-amber-700 leading-relaxed text-right">
+                            كل 150 نقطة تعادل 5,000 دينار عراقي خصم مباشر من مشترياتك!
+                          </p>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
@@ -2936,6 +3441,19 @@ export const CustomerApp: React.FC = () => {
                  </div>
               </div>
 
+              {/* قائمة الفيديوهات المحفوظة والمعجب بها التفاعلية الجديدة */}
+              <ReelsProfileList 
+                currentCustomer={currentCustomer}
+                onAddToCart={(p) => addToCart(p, 1)}
+                onShareReel={(reel) => openShareModal('reel', reel)}
+                onVisitStore={(storeId) => {
+                  const foundStore = stores.find(s => s.id === storeId);
+                  if (foundStore) {
+                    setSelectedStore(foundStore);
+                  }
+                }}
+              />
+
               {/* أقسام البيانات والإعدادات */}
               <div className="space-y-4">
                   {/* 1. البيانات الشخصية */}
@@ -3146,10 +3664,12 @@ export const CustomerApp: React.FC = () => {
         </main>
         </>
         )}
-        <nav className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md border-t border-slate-200/60 z-50 shadow-[0_-5px_20px_rgba(0,0,0,0.03)] select-none">
+        {activeTab !== 'reels' && (
+          <nav className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md border-t border-slate-200/60 z-50 shadow-[0_-5px_20px_rgba(0,0,0,0.03)] select-none">
           <div className="max-w-4xl mx-auto w-full flex justify-around items-center px-4 py-3">
             {[
               { id: 'stores', label: 'الرئيسية', icon: Home },
+              { id: 'reels', label: 'الفيديو', icon: Tv },
               { id: 'merchants', label: 'المتاجر', icon: StoreIcon },
               { id: 'orders', label: 'طلباتي', icon: ClipboardList, badge: customerOrders.filter(o => o.status === 'pending').length },
               { id: 'wallet', label: 'المحفظة', icon: Wallet, gift: currentCustomer.points >= 100 },
@@ -3186,6 +3706,21 @@ export const CustomerApp: React.FC = () => {
             })}
           </div>
         </nav>
+        )}
+
+        {/* زر عائم تفاعلي للرجوع للمتاجر عند التصفح كلياً */}
+        {selectedStore && (
+          <div className="fixed bottom-24 left-6 z-[60]">
+            <button 
+              onClick={() => setSelectedStore(null)}
+              className="px-4 py-3 bg-gradient-to-r from-[#4D2980] to-[#9952FF] text-white hover:from-[#381a66] hover:to-[#4D2980] rounded-full flex items-center gap-2 shadow-xl shadow-purple-500/30 hover:scale-105 active:scale-95 transition-all duration-300 cursor-pointer font-black text-xs border border-white/20 font-tajawal"
+              title="رجوع"
+            >
+              <ChevronRight size={16} />
+              <span>رجوع</span>
+            </button>
+          </div>
+        )}
 
         {/* سلة المشتريات (Drawer) - تصميم مصغر ومحسن ليتناسق مع المتجر */}
         {showCart && (
@@ -3229,25 +3764,47 @@ export const CustomerApp: React.FC = () => {
 
                   <div className="flex-1 overflow-y-auto p-3 space-y-3">
                     {/* معلومات العنوان المختار داخل السلة مع إمكانية التغيير */}
-                    <div className="bg-slate-50 rounded-xl p-2.5 border border-slate-100 flex items-center justify-between shadow-2xs">
-                      <div className="flex items-center gap-2">
-                         <div className="p-1.5 bg-white text-[#9952FF] rounded-lg shadow-3xs border border-slate-100 shrink-0">
-                            <MapPin size={14} />
-                         </div>
-                         <div className="text-right min-w-0">
-                            <p className="text-[8.5px] font-black text-slate-400 mb-0.5">عنوان التوصيل الحالي</p>
-                            <p className="text-[9.5px] font-black text-slate-700 leading-tight truncate">
-                              {currentCustomer?.province} {currentCustomer?.address ? `- ${currentCustomer.address}` : ''}
-                            </p>
-                         </div>
+                    <div className="bg-slate-50 rounded-xl p-2.5 border border-slate-100 shadow-2xs">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                           <div className="p-1.5 bg-white text-[#9952FF] rounded-lg shadow-3xs border border-slate-100 shrink-0">
+                              <MapPin size={14} />
+                           </div>
+                           <div className="text-right min-w-0">
+                              <p className="text-[8.5px] font-black text-slate-400 mb-0.5">عنوان التوصيل الحالي</p>
+                              <p className="text-[9.5px] font-black text-slate-700 leading-tight whitespace-normal break-words">
+                                {currentCustomer?.province} {currentCustomer?.address ? `- ${currentCustomer.address}` : ''}
+                              </p>
+                           </div>
+                        </div>
+                        <button 
+                          onClick={() => { setShowCart(false); setActiveTab('profile'); }}
+                          className="p-1.5 text-[#9952FF] hover:bg-[#f5eeff] rounded-lg transition-all shrink-0"
+                          title="تغيير العنوان"
+                        >
+                           <RefreshCw size={14} />
+                        </button>
                       </div>
-                      <button 
-                        onClick={() => { setShowCart(false); setActiveTab('profile'); }}
-                        className="p-1.5 text-[#9952FF] hover:bg-[#f5eeff] rounded-lg transition-all shrink-0"
-                        title="تغيير العنوان"
-                      >
-                         <RefreshCw size={14} />
-                      </button>
+                      
+                      {/* الخريطة المصغرة في السلة */}
+                      {adminSettings?.enableMaps !== false && currentCustomer?.lat && currentCustomer?.lng && (
+                        <div className="w-full h-24 rounded-xl overflow-hidden border border-slate-200 pointer-events-none relative mt-2 z-0">
+                          <MapContainer 
+                            center={[currentCustomer.lat, currentCustomer.lng]} 
+                            zoom={14} 
+                            style={{ height: "100%", width: "100%", zIndex: 0 }}
+                            zoomControl={false}
+                            attributionControl={false}
+                            dragging={false}
+                            scrollWheelZoom={false}
+                            doubleClickZoom={false}
+                          >
+                            <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                            <Marker position={[currentCustomer.lat, currentCustomer.lng]} />
+                          </MapContainer>
+                          <div className="absolute inset-0 z-[400] bg-transparent"></div>
+                        </div>
+                      )}
                     </div>
 
                     {/* عرض المنتجات مجمعة حسب المتجر */}
@@ -3390,128 +3947,291 @@ export const CustomerApp: React.FC = () => {
         {/* مودال تفاصيل المنتج المطور */}
         <AnimatePresence>
           {selectedProductDetail && (
-            <div className="fixed inset-0 bg-[#4D2980]/80 backdrop-blur-md z-[80] flex items-center justify-center p-0 md:p-4 overflow-y-auto">
+            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xl z-[80] flex items-center justify-center p-0 md:p-6 overflow-y-auto">
               <motion.div 
                 initial={{ opacity: 0, scale: 0.95, y: 50 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, y: 50 }}
-                className="bg-white w-full max-w-2xl min-h-screen md:min-h-0 md:rounded-[3rem] shadow-2xl overflow-hidden text-right flex flex-col relative"
+                className="bg-slate-50 w-full max-w-4xl min-h-screen md:min-h-0 md:max-h-[88vh] md:rounded-[2.5rem] shadow-2xl overflow-hidden text-right flex flex-col relative border border-slate-100/50"
               >
-                {/* زر الرجوع المطور */}
+                {/* زر الرجوع للمتجر الثابت التفاعلي */}
                 <button 
                   onClick={() => setSelectedProductDetail(null)}
-                  className="absolute top-6 left-6 z-20 px-4 py-2 bg-white/95 backdrop-blur-sm text-[#4D2980] rounded-2xl flex items-center gap-2 shadow-2xl border border-slate-100 hover:scale-105 active:scale-95 transition-all font-black text-xs"
+                  className="absolute top-4 left-4 z-40 px-3.5 py-2.5 bg-white/95 backdrop-blur-md text-slate-800 hover:text-[#4D2980] rounded-full flex items-center gap-1.5 shadow-lg border border-slate-200/60 hover:scale-105 active:scale-95 transition-all text-xs font-black cursor-pointer font-tajawal"
+                  title="الرجوع للمتجر"
                 >
-                  <ChevronRight size={18} />
-                  <span>رجوع</span>
+                  <ChevronRight size={16} className="text-[#4D2980]" />
+                  <span>رجوع للمتجر</span>
                 </button>
 
-                <div className="flex flex-col md:flex-row h-full">
-                  {/* الصورة الكبيرة */}
-                  <div className="w-full md:w-1/2 h-[50vh] md:h-auto bg-slate-100 relative group">
+                <div className="flex flex-col md:flex-row h-full md:max-h-[88vh] overflow-y-auto md:overflow-hidden flex-1">
+                  {/* قسم الصورة عالي الدقة المعزز بالمؤثرات */}
+                  <div className="w-full md:w-5/12 h-[45vh] md:h-full bg-slate-150 relative shrink-0 group">
                     <img 
                       src={selectedProductDetail.image || undefined} 
                       alt={selectedProductDetail.name} 
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-cover select-none"
                     />
-                    {selectedProductDetail.discountType !== 'none' && (
-                      <div className="absolute bottom-6 right-6 bg-rose-500 text-white px-4 py-2 rounded-2xl font-black text-sm shadow-xl shadow-rose-200">
-                        {selectedProductDetail.discountType === 'percent' ? `خصم ${selectedProductDetail.discountValue}%` : `توفير ${selectedProductDetail.discountValue.toLocaleString()} د.ع`}
-                      </div>
-                    )}
+                    
+                    {/* التافسات الملقاة على الصورة */}
+                    <div className="absolute top-4 right-4 flex flex-col gap-2">
+                      {selectedProductDetail.discountType !== 'none' && (
+                        <div className="bg-rose-500 text-white px-3 py-1.5 rounded-xl font-black text-[10px] sm:text-xs shadow-lg shadow-rose-200/40 flex items-center gap-1.5">
+                          <span>{selectedProductDetail.discountType === 'percent' ? `خصم ${selectedProductDetail.discountValue}%` : `توفير ${selectedProductDetail.discountValue.toLocaleString()} د.ع`}</span>
+                        </div>
+                      )}
+                      {selectedProductDetail.isFreeDelivery && (
+                        <div className="bg-[#9952FF] text-white px-3 py-1.5 rounded-xl font-black text-[10px] sm:text-xs shadow-lg shadow-purple-200/40 flex items-center gap-1.5">
+                          <Zap size={10} className="fill-white" />
+                          <span>توصيل مجاني</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
-                  {/* المحتوى */}
-                  <div className="w-full md:w-1/2 p-8 flex flex-col justify-center">
-                    <div className="flex justify-between items-start mb-4">
-                      <div className="flex-1">
-                        <span className="text-[10px] font-black tracking-widest text-[#9952FF] uppercase px-3 py-1 bg-[#f5eeff] rounded-full inline-block mb-3">
-                          {selectedProductDetail.category}
+                  {/* تفاصيل ومعلومات المنتج المرتبة والمنسقة بشكل فني */}
+                  <div className="w-full md:w-7/12 flex flex-col bg-white overflow-hidden relative">
+                    {/* تفاصيل قابلة للتمرير في ديسكتوب وموبايل */}
+                    <div className="p-6 md:p-8 overflow-y-auto flex-1 space-y-5 pb-32">
+                      
+                      {/* القسم العلوي: تصنيف المنتج وحالة التوفر */}
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-black tracking-wider text-[#9952FF] uppercase px-3 py-1 bg-[#f5eeff] rounded-lg border border-[#e9daff]/30">
+                          {selectedProductDetail.category || 'غير مصنف'}
                         </span>
-                        <h2 className="text-2xl font-black text-[#4D2980] leading-tight mb-2">
+                        
+                        {/* حالة التوفر في المخزن */}
+                        {selectedProductDetail.inventory !== undefined ? (
+                          <span className={`text-[10px] font-bold px-2.5 py-1 rounded-lg flex items-center gap-1.5 ${
+                            selectedProductDetail.inventory > 0 
+                              ? 'bg-emerald-50 text-emerald-600 border border-emerald-150' 
+                              : 'bg-rose-50 text-rose-600 border border-rose-150'
+                          }`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${selectedProductDetail.inventory > 0 ? 'bg-emerald-500' : 'bg-rose-500'} animate-pulse`} />
+                            {selectedProductDetail.inventory > 0 ? `متوفر في المخزن (${selectedProductDetail.inventory} قطعة)` : 'نفذت الكمية'}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-bold px-2.5 py-1 rounded-lg flex items-center gap-1.5 bg-emerald-50 text-emerald-600 border border-emerald-150">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                            جاهز للتوصيل السريع
+                          </span>
+                        )}
+                      </div>
+
+                      {/* عنوان المنتج الفخم والبراند */}
+                      <div className="space-y-1">
+                        {selectedProductDetail.brand && selectedProductDetail.brand.trim() !== '' && (
+                          <span className="text-slate-400 font-mono text-[11px] font-bold tracking-wider block">
+                            الماركة: {selectedProductDetail.brand}
+                          </span>
+                        )}
+                        <h2 className="text-xl sm:text-2xl md:text-3xl font-black text-slate-800 leading-tight whitespace-normal break-words max-w-full">
                           {selectedProductDetail.name}
                         </h2>
+                      </div>
 
-                        {selectedProductDetail.tags && selectedProductDetail.tags.length > 0 && (
-                          <div className="flex flex-wrap gap-2 mb-4">
-                            {selectedProductDetail.tags.map(tag => (
-                              <span key={tag} className="px-3 py-1 bg-slate-100 text-slate-600 rounded-xl text-[10px] font-black border border-slate-200">
-                                {tag}
+                      {/* الوسوم المتداخلة */}
+                      {selectedProductDetail.tags && selectedProductDetail.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5">
+                          {selectedProductDetail.tags.map(tag => (
+                            <span key={tag} className="px-2.5 py-0.5 bg-slate-50 text-slate-500 rounded-lg text-[9.5px] font-semibold border border-slate-100">
+                              #{tag}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* السعر الحالي والخصم مع خط الدعم الهادئ */}
+                      {selectedProductDetail.discountType !== 'none' ? (
+                        <div className="bg-gradient-to-br from-[#fcfafe] to-white border border-[#e9daff]/50 rounded-2xl p-4 flex justify-between items-center shadow-2xs">
+                          <div>
+                            <span className="text-[10px] text-slate-400 font-bold block mb-0.5">السعر الحالي الجديد</span>
+                            <div className="flex items-baseline gap-1">
+                              <span className="text-2xl sm:text-3xl font-black text-[#9952FF]">
+                                {selectedProductDetail.finalPrice.toLocaleString()}
                               </span>
-                            ))}
-                          </div>
-                        )}
-
-                        {selectedProductDetail.specialOffer && (
-                          <div className="bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-2xl p-4 flex items-center gap-3 animate-pulse">
-                            <Ticket size={24} className="text-emerald-500" />
-                            <div className="flex-1">
-                                <p className="text-[10px] font-black uppercase tracking-widest text-emerald-700 opacity-60">عرض خاص متوفر</p>
-                                <p className="text-sm font-black">{selectedProductDetail.specialOffer}</p>
+                              <span className="text-xs font-black text-[#9952FF]">د.ع</span>
                             </div>
                           </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <p className="text-slate-500 text-sm leading-relaxed mb-8 flex-1">
-                      {selectedProductDetail.description || 'هذا المنتج المميز متوفر الآن في متجرنا. جودة عالية وسعر مناسب.'}
-                    </p>
-
-                    <div className="space-y-6">
-                      <div className="flex items-center justify-between bg-slate-50 p-4 rounded-3xl">
-                        <div className="text-right">
-                          <p className="text-[10px] font-black text-slate-400 mb-1">السعر الحالي</p>
-                          <div className="flex items-baseline gap-2">
-                            <span className="text-2xl font-black text-[#9952FF]">
-                              {(selectedProductDetail.finalPrice || selectedProductDetail.price).toLocaleString()}
-                            </span>
-                            <span className="text-xs font-black text-slate-400">د.ع</span>
+                          
+                          <div className="text-left">
+                            <span className="text-[10px] text-slate-400 font-medium block mb-0.5">السعر الأصلي السابق</span>
+                            <div className="flex flex-col items-end">
+                              <span className="text-sm font-bold text-slate-400/90 line-through">
+                                {selectedProductDetail.price.toLocaleString()} د.ع
+                              </span>
+                              <span className="bg-rose-50 text-rose-600 text-[9px] font-black px-2 py-0.5 rounded-md border border-rose-100 mt-1">
+                                وفرت {selectedProductDetail.discountType === 'percent' ? `${selectedProductDetail.discountValue}%` : `${selectedProductDetail.discountValue.toLocaleString()} د.ع`}
+                              </span>
+                            </div>
                           </div>
                         </div>
+                      ) : (
+                        <div className="bg-slate-50 border border-slate-200/50 rounded-2xl p-4 flex justify-between items-center shadow-2xs">
+                          <div>
+                            <span className="text-[10px] text-slate-400 font-bold block mb-0.5">السعر الشامل للمنتج</span>
+                            <div className="flex items-baseline gap-1">
+                              <span className="text-2xl sm:text-3xl font-black text-slate-800">
+                                {selectedProductDetail.price.toLocaleString()}
+                              </span>
+                              <span className="text-xs font-black text-slate-500">د.ع</span>
+                            </div>
+                          </div>
+                          <span className="text-[9.5px] text-[#4D2980] bg-[#f5eeff] border border-[#e9daff]/60 px-3 py-1 rounded-lg font-black">الدفع عند التوصيل</span>
+                        </div>
+                      )}
 
-                        <div className="flex items-center bg-white rounded-2xl shadow-sm border border-slate-100 p-1">
+                      {/* العرض الخاص المميز */}
+                      {selectedProductDetail.specialOffer && selectedProductDetail.specialOffer.trim() !== '' && (
+                        <div className="bg-[#FAF7FF] border-2 border-dashed border-[#e9daff] rounded-2xl p-4 flex items-start gap-3 shadow-2xs">
+                          <div className="p-2.5 bg-[#f5eeff] text-[#9952FF] rounded-xl self-center shrink-0">
+                            <Ticket size={20} className="animate-pulse" />
+                          </div>
+                          <div className="flex-1 mt-0.5 text-right">
+                            <p className="text-[9px] font-black uppercase text-[#9952FF] tracking-wider mb-0.5">عرض خاص وحصري متوفر الآن</p>
+                            <p className="text-xs font-black text-[#4D2980]">{selectedProductDetail.specialOffer}</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* مواصفات وتفاصيل المنتج الكثيفة مصفوفة بطريقة رائعة */}
+                      {((selectedProductDetail.condition && selectedProductDetail.condition.trim() !== '') || 
+                        (selectedProductDetail.warranty && selectedProductDetail.warranty.trim() !== '') || 
+                        (selectedProductDetail.color && selectedProductDetail.color.trim() !== '') || 
+                        (selectedProductDetail.size && selectedProductDetail.size.trim() !== '') || 
+                        (selectedProductDetail.weight && selectedProductDetail.weight.trim() !== '') || 
+                        (selectedProductDetail.length && String(selectedProductDetail.length).trim() !== '') || 
+                        (selectedProductDetail.width && String(selectedProductDetail.width).trim() !== '')) && (
+                        <div className="space-y-2">
+                          <h3 className="text-xs font-black text-slate-800 border-r-4 border-[#9952FF] pr-2.5 py-0.5">
+                            مواصفات وفهرس المنتج
+                          </h3>
+                          
+                          <div className="grid grid-cols-2 gap-2 bg-slate-50/70 p-2.5 rounded-2xl border border-slate-100">
+                            {/* تفاصيل الماركتينغ والحالة */}
+                            {selectedProductDetail.condition && selectedProductDetail.condition.trim() !== '' && (
+                              <div className="flex justify-between items-center p-2.5 bg-white rounded-xl border border-slate-150/40">
+                                <span className="text-slate-400 text-[10px] font-bold">الحالة الفنية</span>
+                                <span className="text-[10.5px] font-black text-slate-700 bg-slate-50 px-2.5 py-0.5 rounded-md border border-slate-100">
+                                  {selectedProductDetail.condition === 'new' ? 'جديد بالكامل' : selectedProductDetail.condition === 'used' ? 'مستعمل مميز' : selectedProductDetail.condition}
+                                </span>
+                              </div>
+                            )}
+
+                            {selectedProductDetail.warranty && selectedProductDetail.warranty.trim() !== '' && (
+                              <div className="flex justify-between items-center p-2.5 bg-white rounded-xl border border-slate-150/40">
+                                <span className="text-slate-400 text-[10px] font-bold">الضمان والصيانة</span>
+                                <span className="text-[10.5px] font-black text-emerald-600 bg-emerald-50 px-2.5 py-0.5 rounded-md border border-emerald-150">
+                                  {selectedProductDetail.warranty}
+                                </span>
+                              </div>
+                            )}
+
+                            {selectedProductDetail.color && selectedProductDetail.color.trim() !== '' && (
+                              <div className="flex justify-between items-center p-2.5 bg-white rounded-xl border border-slate-150/40">
+                                <span className="text-slate-400 text-[10px] font-bold">اللون المتاح</span>
+                                <span className="text-[10.5px] font-black text-slate-700">{selectedProductDetail.color}</span>
+                              </div>
+                            )}
+
+                            {selectedProductDetail.size && selectedProductDetail.size.trim() !== '' && (
+                              <div className="flex justify-between items-center p-2.5 bg-white rounded-xl border border-slate-150/40">
+                                <span className="text-slate-400 text-[10px] font-bold">المقاس المطلوب</span>
+                                <span className="text-[10.5px] font-black font-mono text-[#9952FF] bg-[#f5eeff] px-2 py-0.5 rounded">
+                                  {selectedProductDetail.size}
+                                </span>
+                              </div>
+                            )}
+
+                            {selectedProductDetail.weight && selectedProductDetail.weight.trim() !== '' && (
+                              <div className="flex justify-between items-center p-2.5 bg-white rounded-xl border border-slate-150/40">
+                                <span className="text-slate-400 text-[10px] font-bold">الوزن التقريبي</span>
+                                <span className="text-[10.5px] font-black text-slate-700 font-mono">{selectedProductDetail.weight}</span>
+                              </div>
+                            )}
+
+                            {((selectedProductDetail.length && String(selectedProductDetail.length).trim() !== '') || 
+                              (selectedProductDetail.width && String(selectedProductDetail.width).trim() !== '')) && (
+                              <div className="flex justify-between items-center p-2.5 bg-white rounded-xl border border-slate-150/40 col-span-2">
+                                <span className="text-slate-400 text-[10px] font-bold">أبعاد المنتج (طول × عرض)</span>
+                                <span className="text-[10.5px] font-black text-slate-700 font-mono" dir="ltr">
+                                  {selectedProductDetail.length || '—'} × {selectedProductDetail.width || '—'}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* الوصف المعزز الفاخر */}
+                      <div className="space-y-2">
+                        <h3 className="text-xs font-black text-slate-800 border-r-4 border-[#9952FF] pr-2.5 py-0.5">
+                          نبذة ووصف المنتج تفصيليلاً
+                        </h3>
+                        <div className="bg-slate-50/40 p-4 rounded-2xl border border-slate-100 text-slate-600 text-xs leading-relaxed font-tajawal whitespace-normal break-words">
+                          {selectedProductDetail.description || 'هذا المنتج المميز متوفر الآن في متجرنا الرسمي.'}
+                        </div>
+                      </div>
+
+                    </div>
+
+                    {/* شريط الإجراءات والتحكم التفاعلي بالطلب (عائم بتثبيت ذكي) */}
+                    <div className="absolute bottom-0 left-0 right-0 bg-white/80 backdrop-blur-md p-4 sm:p-5 border-t border-slate-200/50 flex flex-col gap-3.5 z-10 w-full shrink-0">
+                      
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-black text-slate-500">الكمية المراد طلبها:</span>
+                        
+                        <div className="flex items-center bg-slate-100 border border-slate-200/60 rounded-2xl p-0.5 shadow-2xs">
                           <button 
                             onClick={() => setDetailQty(Math.max(1, detailQty - 1))}
-                            className="w-10 h-10 flex items-center justify-center text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all"
+                            className="w-9 h-9 flex items-center justify-center text-slate-500 hover:text-rose-600 hover:bg-white rounded-xl transition-all active:scale-95 cursor-pointer"
                           >
-                            <Minus size={18} />
+                            <Minus size={14} />
                           </button>
-                          <span className="w-10 text-center font-black text-[#4D2980]">{detailQty}</span>
+                          <span className="w-10 text-center font-black text-[#4D2980] text-sm font-mono select-none">{detailQty}</span>
                           <button 
                             onClick={() => setDetailQty(detailQty + 1)}
-                            className="w-10 h-10 flex items-center justify-center text-[#9952FF] hover:bg-[#f5eeff] rounded-xl transition-all"
+                            className="w-9 h-9 flex items-center justify-center text-[#9952FF] hover:bg-white rounded-xl transition-all active:scale-95 cursor-pointer"
                           >
-                            <Plus size={18} />
+                            <Plus size={14} />
                           </button>
                         </div>
                       </div>
 
-                      <div className="flex gap-3">
+                      <div className="flex gap-2 w-full">
                         <button 
                           onClick={() => {
                             addToCart(selectedProductDetail, detailQty);
                             setSelectedProductDetail(null);
                           }}
-                          className="flex-[3] bg-[#4D2980] hover:bg-[#4D2980] text-white py-4 rounded-[1.5rem] font-black text-sm shadow-xl shadow-slate-200 transition-all active:scale-[0.98] flex items-center justify-center gap-3"
+                          className="flex-[4] bg-[#4D2980] hover:bg-[#381a66] text-white py-3.5 px-4 rounded-2xl font-black text-xs sm:text-sm shadow-lg shadow-[#4D2980]/15 hover:shadow-[#4D2980]/25 transition-all active:scale-[0.97] flex items-center justify-center gap-2 cursor-pointer"
                         >
-                          <ShoppingCart size={20} />
-                          إضافة للسلة ({( (selectedProductDetail.finalPrice || selectedProductDetail.price) * detailQty).toLocaleString()} د.ع)
+                          <ShoppingCart size={16} />
+                          <span>إضافة للسلة</span>
+                          <span className="font-mono bg-white/10 px-2 py-0.5 rounded-lg text-[10px] sm:text-xs">
+                            ({((selectedProductDetail.finalPrice || selectedProductDetail.price) * detailQty).toLocaleString()} د.ع)
+                          </span>
                         </button>
+
                         <button 
                           onClick={() => openShareModal('product', { ...selectedProductDetail, shopName: selectedStore?.shopName })}
-                          className="flex-1 bg-white border border-slate-200 text-slate-600 hover:border-[#9952FF] hover:text-[#9952FF] py-4 rounded-[1.5rem] flex items-center justify-center transition-all shadow-sm"
+                          className="w-12 h-12 bg-slate-50 hover:bg-[#FAF7FF] border border-slate-200 hover:border-[#9952FF]/30 text-slate-600 hover:text-[#9952FF] rounded-2xl flex items-center justify-center transition-all shadow-2xs active:scale-[0.95] shrink-0 cursor-pointer"
+                          title="مشاركة المنتج"
                         >
-                          <Share2 size={24} />
+                          <Share2 size={18} />
                         </button>
+
                         <button 
                           onClick={() => setShowRateModal({ type: 'product', data: selectedProductDetail })}
-                          className="flex-1 bg-amber-50 border border-amber-200 text-amber-600 hover:bg-amber-100 py-4 rounded-[1.5rem] flex items-center justify-center transition-all shadow-sm"
+                          className="w-12 h-12 bg-amber-50 hover:bg-amber-100/60 border border-amber-200 text-amber-600 rounded-2xl flex items-center justify-center transition-all shadow-2xs active:scale-[0.95] shrink-0 cursor-pointer"
+                          title="قراءة المراجعات والتقييم"
                         >
-                          <Sparkles size={24} />
+                          <Sparkles size={18} className="fill-amber-400 text-amber-600" />
                         </button>
                       </div>
+
                     </div>
+
                   </div>
                 </div>
               </motion.div>
@@ -3663,12 +4383,21 @@ export const CustomerApp: React.FC = () => {
                     >
                       تتبع طلبي الآن
                     </button>
-                    <button 
-                      onClick={() => { setShowOrderSuccess(false); handleTabChange('stores'); setSelectedStore(null); }}
-                      className="py-4 bg-white text-[#9952FF] border border-[#e9daff] font-black rounded-2xl shadow-sm hover:bg-[#f5eeff] transition-all active:scale-95 text-[10px] sm:text-xs"
-                    >
-                      إكمال التسوق
-                    </button>
+                    {activeTab === 'reels' ? (
+                      <button 
+                        onClick={() => { setShowOrderSuccess(false); }}
+                        className="py-4 bg-white text-[#9952FF] border border-[#e9daff] font-black rounded-2xl shadow-sm hover:bg-[#f5eeff] transition-all active:scale-95 text-[10px] sm:text-xs"
+                      >
+                        العودة للفيديو
+                      </button>
+                    ) : (
+                      <button 
+                        onClick={() => { setShowOrderSuccess(false); handleTabChange('stores'); setSelectedStore(null); }}
+                        className="py-4 bg-white text-[#9952FF] border border-[#e9daff] font-black rounded-2xl shadow-sm hover:bg-[#f5eeff] transition-all active:scale-95 text-[10px] sm:text-xs"
+                      >
+                        إكمال التسوق
+                      </button>
+                    )}
                   </div>
                 </div>
               </motion.div>
@@ -3799,6 +4528,106 @@ export const CustomerApp: React.FC = () => {
                     className="w-full py-2 text-xs font-bold text-slate-400 hover:text-[#9952FF] transition-colors"
                   >
                     إلغاء والبقاء في الصفحة
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        {/* نافذة عرض الروابط الخارجية داخل التطبيق مع زر الرجوع للتطبيق */}
+        <AnimatePresence>
+          {iframeUrl && (
+            <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-[150] flex flex-col overflow-hidden animate-fade-in" dir="rtl">
+              {/* شريط التحكم العلوي */}
+              <div className="bg-gradient-to-l from-[#4D2980] to-[#381a66] text-white py-3 px-4 flex items-center justify-between shadow-lg border-b border-white/10 z-50">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center">
+                    <ShoppingBag size={18} className="text-amber-400" />
+                  </div>
+                  <div className="max-w-[150px] sm:max-w-xs text-right">
+                    <h3 className="text-xs sm:text-sm font-black text-white font-tajawal">مستعرض محلك الداخلي</h3>
+                    <p className="text-[10px] text-slate-300 font-bold truncate leading-none mt-0.5">{iframeUrl}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      try {
+                        navigator.clipboard.writeText(iframeUrl);
+                        alert('تم نسخ الرابط بنجاح! ✅');
+                      } catch (err) {
+                        console.error(err);
+                      }
+                    }}
+                    className="p-2 hover:bg-white/10 rounded-xl text-white transition-colors animate-pulse"
+                    title="نسخ الرابط"
+                  >
+                    <Copy size={16} />
+                  </button>
+                  <button
+                    onClick={() => setIframeUrl(null)}
+                    className="px-4 py-2 sm:px-5 sm:py-2.5 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 active:scale-95 text-slate-900 font-extrabold rounded-xl text-xs sm:text-sm shadow-md transition-all flex items-center gap-1.5"
+                  >
+                    <ChevronRight size={16} className="rotate-180" />
+                    <span>الرجوع للتطبيق</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* محتوى الصفحة الخارجي */}
+              <div className="flex-1 bg-white relative">
+                <iframe
+                  src={iframeUrl}
+                  className="w-full h-full border-none"
+                  title="موقع خارجي"
+                  sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+                />
+              </div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        {/* نافذة تأكيد إلغاء الطلب بفترة الـ 30 ثانية */}
+        <AnimatePresence>
+          {orderToCancel && (
+            <div className="fixed inset-0 bg-[#4D2980]/50 backdrop-blur-xs z-[100] flex items-center justify-center p-4" dir="rtl">
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                className="bg-white w-full max-w-sm rounded-[2.5rem] shadow-2xl overflow-hidden text-right border border-slate-100"
+              >
+                <div className="p-8">
+                  <div className="w-16 h-16 bg-rose-50 text-rose-500 rounded-2xl flex items-center justify-center mx-auto mb-6 border border-rose-100">
+                    <AlertTriangle size={32} />
+                  </div>
+                  <h3 className="text-xl font-black text-slate-800 text-center mb-2">تأكيد إلغاء الطلب</h3>
+                  <p className="text-sm text-slate-500 text-center leading-relaxed font-tajawal">
+                    هل أنت متأكد من رغبتك في إلغاء الطلب رقم <span className="font-sans font-black bg-slate-100 text-[#4D2980] px-1.5 py-0.5 rounded-sm">#{orderToCancel.id}</span> من متجر <span className="text-[#9952FF] font-black">{orderToCancel.storeName}</span>؟ هذا الإجراء فوري وسيتم إلغاء تحضير الطلب تلقائياً ولا يمكن الرجوع عنه.
+                  </p>
+                </div>
+                
+                <div className="p-6 bg-slate-50 flex flex-col gap-3">
+                  <button 
+                    onClick={async () => {
+                      try {
+                        await updateOrderStatus(orderToCancel.id, 'cancelled', 'تم إلغاء الطلب تلقائياً من قبل الزبون خلال 30 ثانية');
+                        setOrderToCancel(null);
+                      } catch (e) {
+                        console.error("Failed to cancel order", e);
+                      }
+                    }}
+                    className="w-full py-4 bg-rose-600 hover:bg-rose-700 text-white rounded-2xl font-black text-sm shadow-lg shadow-rose-100 transition-all active:scale-[0.98] cursor-pointer"
+                  >
+                    نعم، إلغاء الطلب
+                  </button>
+                  <button 
+                    onClick={() => setOrderToCancel(null)}
+                    className="w-full py-4 bg-white text-slate-600 border border-slate-200 rounded-2xl font-black text-sm hover:bg-slate-100 transition-all active:scale-[0.98] cursor-pointer"
+                  >
+                    تراجع
                   </button>
                 </div>
               </motion.div>

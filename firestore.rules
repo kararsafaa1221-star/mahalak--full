@@ -1,0 +1,164 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ----------------------------------------------------
+    // PERSISTENT HELPERS
+    // ----------------------------------------------------
+    function isSignedIn() { return request.auth != null; }
+    function isVerified() { return isSignedIn() && request.auth.token.email_verified == true; }
+    function isAdmin() { return isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)); }
+    function isOwner(uid) { return isSignedIn() && request.auth.uid == uid; }
+    
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    
+    // ----------------------------------------------------
+    // GLOBAL ADMIN OVERRIDE (GOD MODE) & DEFAULT DENY
+    // ----------------------------------------------------
+    match /{document=**} {
+      // Admins have absolute power over the entire database.
+      // Everyone else is denied by default unless specifically allowed in the blocks below.
+      allow read, write: if isAdmin();
+    }
+
+    // ----------------------------------------------------
+    // ADMINS
+    // ----------------------------------------------------
+    match /admins/{adminId} {
+      allow read, write: if true;
+    }
+
+    // ----------------------------------------------------
+    // USERS (Fallback)
+    // ----------------------------------------------------
+    match /users/{userId} {
+      allow read, write: if true;
+    }
+
+    // ----------------------------------------------------
+    // CUSTOMERS
+    // ----------------------------------------------------
+    function isValidCustomer(data) {
+      return data.keys().hasAll(['id', 'name', 'phone']) &&
+             data.id is string && data.id.size() <= 64 &&
+             data.name is string && data.name.size() <= 100 &&
+             data.phone is string && data.phone.size() <= 20;
+    }
+
+    match /customers/{customerId} {
+      allow read, write: if true;
+    }
+
+    // ----------------------------------------------------
+    // STORES
+    // ----------------------------------------------------
+    function isValidStore(data) {
+      return data.keys().hasAll(['id', 'ownerName', 'shopName', 'phone', 'username']) &&
+             data.id is string && data.id.size() <= 64 &&
+             data.shopName is string && data.shopName.size() <= 100 &&
+             (!data.keys().hasAny(['walletBalance']) || data.walletBalance is number) &&
+             (!data.keys().hasAny(['payoutMethods']) || data.payoutMethods is map);
+    }
+
+    match /stores/{storeId} {
+      allow read, write: if true;
+    }
+
+    // ----------------------------------------------------
+    // PRODUCTS
+    // ----------------------------------------------------
+    function getStore(sid) { return get(/databases/$(database)/documents/stores/$(sid)).data; }
+
+    match /products/{productId} {
+      allow read, write: if true;
+    }
+
+    // ----------------------------------------------------
+    // ORDERS
+    // ----------------------------------------------------
+    match /orders/{orderId} {
+      allow read, write: if true;
+    }
+
+    // ----------------------------------------------------
+    // STORE REVIEWS
+    // ----------------------------------------------------
+    match /store_reviews/{reviewId} {
+      allow read, write: if true;
+    }
+
+    // ----------------------------------------------------
+    // NOTIFICATIONS
+    // ----------------------------------------------------
+    match /notifications/{notificationId} {
+      allow read, write: if true;
+    }
+
+    // ----------------------------------------------------
+    // FLASH SALES
+    // ----------------------------------------------------
+    match /flash_sales/{saleId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /flash_sale_requests/{requestId} {
+      allow read: if true;
+      allow create: if isOwner(getStore(incoming().storeId).ownerId);
+      allow update, delete: if isAdmin();
+    }
+
+    // ----------------------------------------------------
+    // PROMO CODES
+    // ----------------------------------------------------
+    match /promoCodes/{codeId} {
+      allow read, write: if true;
+    }
+    
+    // Also match the old name just in case
+    match /promo_codes/{codeId} {
+      allow read, write: if true;
+    }
+
+    // ----------------------------------------------------
+    // RECHARGE CODES
+    // ----------------------------------------------------
+    match /recharge_codes/{codeId} {
+      allow read, write: if true;
+    }
+
+    // ----------------------------------------------------
+    // TEST CONNECTION
+    // ----------------------------------------------------
+    match /test/{docId} {
+      allow read: if true;
+    }
+
+    // ----------------------------------------------------
+    // GLOBAL SETTINGS
+    // ----------------------------------------------------
+    match /settings/global {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ----------------------------------------------------
+    // PAYOUT REQUESTS
+    // ----------------------------------------------------
+    function isValidPayoutRequest(data) {
+      return data.keys().hasAll(['id', 'merchantId', 'requestedAmount', 'status', 'createdAt']) &&
+             data.id is string &&
+             data.merchantId is string &&
+             data.requestedAmount is number &&
+             data.requestedAmount >= 5000 &&
+             data.status in ['pending', 'completed', 'rejected'] &&
+             (!data.keys().hasAny(['payoutMethodUsed']) || data.payoutMethodUsed in ['zain_cash', 'mastercard']) &&
+             (!data.keys().hasAny(['payoutMethodDetails']) || data.payoutMethodDetails is string || data.payoutMethodDetails is map);
+    }
+
+    match /payoutRequests/{requestId} {
+      allow read, write: if true;
+    }
+  }
+}

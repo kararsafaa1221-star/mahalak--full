@@ -7,6 +7,7 @@ declare global {
   interface Window {
     OneSignalDeferred: any[];
     OneSignal: any;
+<<<<<<< HEAD
     _oneSignalInitialized?: boolean;
     _oneSignalInitFailed?: boolean;
   }
@@ -18,6 +19,11 @@ export function resetPushNotificationSetup() {
   activePushSetupKey = null;
 }
 
+=======
+  }
+}
+
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
 export async function registerServiceWorker() {
   if ('serviceWorker' in navigator) {
     try {
@@ -116,7 +122,11 @@ export async function createNotificationChannels() {
 }
 
 export async function sendExternalPush(
+<<<<<<< HEAD
   targetUserId: string | string[],
+=======
+  targetUserId: string,
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
   title: string,
   message: string,
   channelId: string
@@ -129,6 +139,7 @@ export async function sendExternalPush(
     return;
   }
 
+<<<<<<< HEAD
   const externalIds = Array.isArray(targetUserId) ? targetUserId : [targetUserId];
 
   try {
@@ -137,6 +148,12 @@ export async function sendExternalPush(
       app_id: appId,
       include_aliases: { external_id: externalIds },
       include_external_user_ids: externalIds,
+=======
+  try {
+    const payload = {
+      app_id: appId,
+      include_aliases: { external_id: [targetUserId] },
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
       target_channel: "push",
       headings: { en: title, ar: title },
       contents: { en: message, ar: message },
@@ -150,14 +167,23 @@ export async function sendExternalPush(
       (payload as any).ios_sound = "alert_sound.wav";
     }
 
+<<<<<<< HEAD
     const response = await fetch('/api/onesignal', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
+=======
+    const response = await fetch('https://onesignal.com/api/v1/notifications', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Authorization': `Basic ${restApiKey}`
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
       },
       body: JSON.stringify(payload)
     });
 
+<<<<<<< HEAD
     const responseText = await response.text();
     
     if (!response.ok || responseText.toLowerCase().includes("rate exceeded") || response.status === 429) {
@@ -176,6 +202,9 @@ export async function sendExternalPush(
       console.warn("OneSignal response was not JSON:", responseText.substring(0, 100));
       return;
     }
+=======
+    const data = await response.json();
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
     console.log("OneSignal push sent successfully", data);
   } catch (error) {
     console.error("Error sending OneSignal push:", error);
@@ -188,12 +217,15 @@ export async function setupPushNotifications(
   onNotification?: (notification: any) => void,
   onAction?: (action: any) => void
 ) {
+<<<<<<< HEAD
   const setupKey = `${targetCollection}:${userId}`;
   if (activePushSetupKey === setupKey) {
     return;
   }
   activePushSetupKey = setupKey;
 
+=======
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
   const appId = import.meta.env.VITE_ONESIGNAL_APP_ID || "";
 
   await createNotificationChannels();
@@ -262,6 +294,7 @@ export async function setupPushNotifications(
 
       window.OneSignalDeferred = window.OneSignalDeferred || [];
       window.OneSignalDeferred.push(async function(OneSignal: any) {
+<<<<<<< HEAD
         if (window._oneSignalInitFailed) {
           return;
         }
@@ -304,6 +337,31 @@ export async function setupPushNotifications(
           } catch (err: any) {
              console.warn("OneSignal operation error after init:", err);
           }
+=======
+        await OneSignal.init({
+          appId: appId,
+          allowLocalhostAsSecureOrigin: true,
+        });
+
+        await OneSignal.login(userId);
+
+        OneSignal.Notifications.addEventListener('foregroundWillDisplay', (event: any) => {
+           if (onNotification) onNotification(event.notification);
+        });
+
+        OneSignal.Notifications.addEventListener('click', (event: any) => {
+           if (onAction) onAction(event.notification);
+        });
+
+        if (OneSignal.User && OneSignal.User.PushSubscription) {
+           const osId = OneSignal.User.PushSubscription.id;
+           if (osId) {
+              setDoc(doc(db, targetCollection, userId), {
+                fcmToken: osId,
+                oneSignalId: osId
+              }, { merge: true }).catch(e => console.error("Failed to save OneSignal ID", e));
+           }
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
         }
       });
     } catch (error) {

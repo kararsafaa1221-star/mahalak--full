@@ -4,7 +4,11 @@
     "type": "APK",
     "kind": "Directory"
   },
+<<<<<<< HEAD
   "applicationId": "com.mahalak.app",
+=======
+  "applicationId": "com.mahalak",
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
   "variantName": "release",
   "elements": [
     {
@@ -12,7 +16,11 @@
       "filters": [],
       "attributes": [],
       "versionCode": 1,
+<<<<<<< HEAD
       "versionName": "1.0.0",
+=======
+      "versionName": "1.0",
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
       "outputFile": "app-release.apk"
     }
   ],

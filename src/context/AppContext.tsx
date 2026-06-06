@@ -14,6 +14,7 @@ import {
   getDocFromServer,
   writeBatch,
   increment,
+<<<<<<< HEAD
   serverTimestamp,
   runTransaction,
   query,
@@ -24,6 +25,12 @@ import {
 import { 
   onAuthStateChanged,
   signInAnonymously
+=======
+  serverTimestamp
+} from 'firebase/firestore';
+import { 
+  onAuthStateChanged
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
 } from 'firebase/auth';
 import { handleFirestoreError, OperationType } from '../lib/firestoreUtils';
 import { sendExternalPush } from '../lib/pushNotifications';
@@ -43,16 +50,26 @@ import {
   AppNotification, 
   FlashSale, 
   FlashSaleRequest,
+<<<<<<< HEAD
   StoreReview,
   PayoutRequest
 } from '../types';
 import { IRAQ_PROVINCES, SUBSCRIPTION_PLANS } from '../constants';
 import { validateUserStatus } from '../utils/userValidation';
+=======
+  StoreReview
+} from '../types';
+import { IRAQ_PROVINCES, SUBSCRIPTION_PLANS } from '../constants';
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
 
 const generateOrderId = () => 'ORD-' + Math.floor(Math.random() * 1000000);
 
 export interface AppContextType {
+<<<<<<< HEAD
   provinces: Province[]; stores: Store[]; products: Product[]; customers: Customer[]; orders: Order[]; promoCodes: PromoCode[]; notifications: AppNotification[]; payoutRequests: PayoutRequest[]; currentCustomer: Customer | null; currentMerchant: Store | null; currentAdmin: boolean; adminSettings: any; subscriptionPlans: SubscriptionPlan[]; flashSales: FlashSale[]; flashSaleRequests: FlashSaleRequest[]; storeReviews: StoreReview[];
+=======
+  provinces: Province[]; stores: Store[]; products: Product[]; customers: Customer[]; orders: Order[]; promoCodes: PromoCode[]; notifications: AppNotification[]; currentCustomer: Customer | null; currentMerchant: Store | null; currentAdmin: boolean; adminSettings: any; subscriptionPlans: SubscriptionPlan[]; flashSales: FlashSale[]; flashSaleRequests: FlashSaleRequest[]; storeReviews: StoreReview[];
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
   getCustomerSeqId: (id: string | undefined | null) => string;
   getOrderSeqId: (id: string | undefined | null) => string;
   setOrders: React.Dispatch<React.SetStateAction<Order[]>>;
@@ -79,10 +96,14 @@ export interface AppContextType {
   togglePromoCodeStatus: (id: string) => void;
   updateOrder: (id: string, data: Partial<Order>) => Promise<void>;
   updateOrderStatus: (id: string, status: string, reason?: string) => void;
+<<<<<<< HEAD
   requestPayout: (amount: number, methodUsed: 'zain_cash' | 'mastercard', methodDetails: string) => Promise<void>;
   completePayout: (requestId: string) => Promise<void>;
   addNotification: (notif: any) => void;
   addBulkNotifications: (notifs: any[]) => Promise<void>;
+=======
+  addNotification: (notif: any) => void;
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
   markNotificationAsRead: (id: string) => void;
   markAllNotificationsAsRead: (userId: string, role: 'customer' | 'merchant' | 'admin') => void;
   sendAdminNotification: (t: string, m: string, target: string) => void;
@@ -127,7 +148,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [flashSales, setFlashSales] = useState<FlashSale[]>([]);
   const [flashSaleRequests, setFlashSaleRequests] = useState<FlashSaleRequest[]>([]);
   const [storeReviews, setStoreReviews] = useState<StoreReview[]>([]);
+<<<<<<< HEAD
   const [payoutRequests, setPayoutRequests] = useState<PayoutRequest[]>([]);
+=======
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
 
   // Auth States
   const [currentCustomer, setCurrentCustomerState] = useState<Customer | null>(null);
@@ -155,6 +179,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       
       try {
         console.log("Firestore connection test: STARTING...");
+<<<<<<< HEAD
         // Fast fail: test connection
         await getDocFromServer(doc(db, 'test', 'connection'));
         console.log("Firestore connection test: SUCCESS.");
@@ -164,6 +189,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
            // Provide a hint to the user
            console.error("The (default) Firestore database is missing or still provisioning. If you just created it in Firebase Console, it may take 2-5 minutes to become available.");
         }
+=======
+        const testDoc = await getDocFromServer(doc(db, 'test', 'connection'));
+        console.log("Firestore connection test: SUCCESS.", testDoc.exists() ? "(Test doc exists)" : "(Database is reachable)");
+      } catch (error: any) {
+        console.warn("Firestore connection check failed:", error?.message);
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
         
         if (error?.message?.includes('the client is offline')) {
           console.info("Connectivity Tip: If you see 'the client is offline', it may be a temporary network issue or the database may still be initializing. Try refreshing the page.");
@@ -180,6 +211,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       if (isMounted) setAuthLoading(false);
     }, 5000);
 
+<<<<<<< HEAD
     // Ensure we always have an anonymous Firebase session for Firestore Security Rules
     signInAnonymously(auth).catch((e: any) => {
       console.warn("Anonymous auth failed", e.message);
@@ -188,11 +220,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       }
     });
 
+=======
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       clearTimeout(fallbackTimer);
       if (!isMounted) return;
       setAuthLoading(true);
       if (user) {
+<<<<<<< HEAD
         console.log(`[Auth Flow] onAuthStateChanged triggered for user UID: ${user.uid}`);
         try {
           // Try to identify if user is customer, merchant or admin
@@ -247,10 +282,24 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           } else {
             console.error("Error loading user profile:", error);
           }
+=======
+        try {
+          // Try to identify if user is customer, merchant or admin
+          const custDoc = await getDoc(doc(db, 'customers', user.uid));
+          if (custDoc.exists()) {
+            setCurrentCustomerState({ ...custDoc.data() as Customer, id: user.uid });
+          }
+
+          const adminDoc = await getDoc(doc(db, 'admins', user.uid));
+          if (adminDoc.exists() || user.email === 'kararsafaa1221@gmail.com') setCurrentAdminState(true);
+        } catch (error) {
+          console.error("Error loading user profile:", error);
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
           // If profile fails to load due to network or permission error, we should still stop loading
         }
       } else {
         setCurrentCustomerState(null);
+<<<<<<< HEAD
         setCurrentAdminState(false);
       }
 
@@ -318,6 +367,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setCurrentMerchantState(null);
       }
 
+=======
+        setCurrentMerchantState(null);
+        setCurrentAdminState(false);
+      }
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
       setAuthLoading(false);
     }, (error) => {
       console.error("Auth state observer error:", error);
@@ -338,59 +392,102 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const unsubStores = onSnapshot(collection(db, 'stores'), (snap) => {
       const uniqueStores = Array.from(new Map(snap.docs.map(d => [d.id, { ...d.data() as Store, id: d.id }])).values());
       setStores(uniqueStores);
+<<<<<<< HEAD
     }, (error) => console.warn("Stores stream filtered:", error.message));
+=======
+    }, () => handleFirestoreError(new Error('Permission denied'), OperationType.LIST, 'stores'));
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
 
     // Products
     const unsubProducts = onSnapshot(collection(db, 'products'), (snap) => {
       const uniqueProducts = Array.from(new Map(snap.docs.map(d => [d.id, { ...d.data() as Product, id: d.id }])).values());
       setProducts(uniqueProducts);
+<<<<<<< HEAD
     }, (error) => console.warn("Products stream filtered:", error.message));
+=======
+    }, () => handleFirestoreError(new Error('Permission denied'), OperationType.LIST, 'products'));
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
 
     // Customers (Admins only see all, customers see themselves)
     const unsubCust = onSnapshot(collection(db, 'customers'), (snap) => {
       const uniqueCustomers = Array.from(new Map(snap.docs.map(d => [d.id, { ...d.data() as Customer, id: d.id }])).values());
       setCustomers(uniqueCustomers);
+<<<<<<< HEAD
     }, (error) => console.warn("Limited access to customers list", error.message));
+=======
+    }, () => {
+      // If permission denied, it's expected for non-admins, but we handle it
+      console.warn("Limited access to customers list");
+    });
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
 
     // Orders
     const unsubOrders = onSnapshot(collection(db, 'orders'), (snap) => {
       setOrders(Array.from(new Map(snap.docs.map(d => [d.id, { ...d.data() as Order, id: d.id }])).values()));
+<<<<<<< HEAD
     }, (error) => console.warn("Order stream filtered by security rules", error.message));
+=======
+    }, () => console.warn("Order stream filtered by security rules"));
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
 
     // Notifications
     const unsubNotifs = onSnapshot(collection(db, 'notifications'), (snap) => {
       setNotifications(Array.from(new Map(snap.docs.map(d => [d.id, { ...d.data() as AppNotification, id: d.id }])).values()));
+<<<<<<< HEAD
     }, (error) => console.warn("Notification stream filtered by security rules", error.message));
+=======
+    }, () => console.warn("Notification stream filtered by security rules"));
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
 
     // Rehab Codes
     const unsubRecharge = onSnapshot(collection(db, 'recharge_codes'), (snap) => {
       setRechargeCodes(Array.from(new Map(snap.docs.map(d => [d.id, { ...d.data() as RechargeCode, id: d.id }])).values()));
+<<<<<<< HEAD
     }, (error) => console.warn("Recharge codes stream filtered", error.message));
+=======
+    }, () => console.warn("Recharge codes stream filtered"));
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
 
     // Promo Codes
     const unsubPromo = onSnapshot(collection(db, 'promo_codes'), (snap) => {
       setPromoCodes(Array.from(new Map(snap.docs.map(d => [d.id, { ...d.data() as PromoCode, id: d.id }])).values()));
+<<<<<<< HEAD
     }, (error) => console.warn("Promo codes stream filtered:", error.message));
+=======
+    });
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
 
     // Flash Sales
     const unsubFlash = onSnapshot(collection(db, 'flash_sales'), (snap) => {
       setFlashSales(Array.from(new Map(snap.docs.map(d => [d.id, { ...d.data() as FlashSale, id: d.id }])).values()));
+<<<<<<< HEAD
     }, (error) => console.warn("Flash sales stream filtered:", error.message));
+=======
+    });
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
     
     // Flash Sale Requests
     const unsubFlashRequests = onSnapshot(collection(db, 'flash_sale_requests'), (snap) => {
       setFlashSaleRequests(Array.from(new Map(snap.docs.map(d => [d.id, { ...d.data() as FlashSaleRequest, id: d.id }])).values()));
+<<<<<<< HEAD
     }, (error) => console.warn("Flash sale requests stream filtered:", error.message));
+=======
+    });
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
 
     // Store Reviews
     const unsubReviews = onSnapshot(collection(db, 'store_reviews'), (snap) => {
       setStoreReviews(Array.from(new Map(snap.docs.map(d => [d.id, { ...d.data() as StoreReview, id: d.id }])).values()));
+<<<<<<< HEAD
     }, (error) => console.warn("Store reviews stream filtered", error.message));
 
     // Payout Requests
     const unsubPayoutRequests = onSnapshot(collection(db, 'payoutRequests'), (snap) => {
       setPayoutRequests(Array.from(new Map(snap.docs.map(d => [d.id, { ...d.data() as PayoutRequest, id: d.id }])).values()));
     }, (error) => console.warn("Payout requests stream filtered", error.message));
+=======
+    }, () => console.warn("Store reviews stream filtered"));
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
 
     // Global Settings
     const unsubSettings = onSnapshot(doc(db, 'settings', 'global'), (snap) => {
@@ -399,10 +496,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setAdminSettings(data);
         StorageService.save('ADMIN_SETTINGS', data);
       }
+<<<<<<< HEAD
     }, (error) => console.warn("Settings stream filtered:", error.message));
 
     return () => {
       unsubStores(); unsubProducts(); unsubCust(); unsubOrders(); unsubNotifs(); unsubRecharge(); unsubPromo(); unsubFlash(); unsubFlashRequests(); unsubReviews(); unsubSettings(); unsubPayoutRequests();
+=======
+    });
+
+    return () => {
+      unsubStores(); unsubProducts(); unsubCust(); unsubOrders(); unsubNotifs(); unsubRecharge(); unsubPromo(); unsubFlash(); unsubFlashRequests(); unsubReviews(); unsubSettings();
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
     };
   }, []);
 
@@ -445,7 +549,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         }
       });
     }
+<<<<<<< HEAD
     const id = data.id || auth.currentUser?.uid || String(nextNumId);
+=======
+    const id = data.id || String(nextNumId);
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
 
     const newCust: any = { 
       ...data, 
@@ -540,6 +648,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     // Intercept base64 / data URL images and upload to Firebase Storage to prevent Firestore 1MB limits
     if (imageUrl && imageUrl.startsWith('data:image')) {
       try {
+<<<<<<< HEAD
         console.log("1. Starting image upload to Firebase Storage for product:", id);
         imageUrl = await uploadProductImageStorage(imageUrl, id);
         console.log("2. Image uploaded successfully. Received URL:", imageUrl);
@@ -548,18 +657,29 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         // Throw an error here to prevent the app from attempting to save a massive Base64 string to Firestore!
         alert("فشل رفع الصورة إلى الخادم (Firebase Storage). يرجى التأكد من تفعيل Storage وقواعد الأمان (Storage Rules).");
         throw new Error("Storage Upload Failed: " + (uploadErr instanceof Error ? uploadErr.message : String(uploadErr)), { cause: uploadErr });
+=======
+        console.log("Uploading product image base64 directly to Firebase Storage...");
+        imageUrl = await uploadProductImageStorage(imageUrl, id);
+      } catch (uploadErr) {
+        console.error("Failed to upload image during creation, keeping original or default:", uploadErr);
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
       }
     }
 
     const newProd = { ...data, id, image: imageUrl, finalPrice, createdAt: serverTimestamp() };
     try {
+<<<<<<< HEAD
       console.log(`3. Saving product data to Firestore: products/${id}`);
       await setDoc(doc(db, 'products', id), newProd);
       console.log("4. Product data successfully written to Firestore!");
+=======
+      await setDoc(doc(db, 'products', id), newProd);
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
 
       // We should send a notification to customers who enabled notifications for this store
       if (customers.length > 0) {
         const storeName = stores.find(s => s.id === data.storeId)?.shopName || 'متجر';
+<<<<<<< HEAD
         const notifs = customers
           .filter(c => c.storeNotifications?.includes(data.storeId))
           .map(c => ({
@@ -576,6 +696,23 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     } catch (e: any) {
       console.error("❌ Firestore Write Failed:", e);
+=======
+        customers.forEach(async (c) => {
+          if (c.storeNotifications?.includes(data.storeId)) {
+            await addNotification({
+              userId: c.id,
+              role: 'customer',
+              title: `منتج جديد من ${storeName} ✨`,
+              message: `تمت إضافة منتج جديد: ${data.name}. سارع بالشراء الآن!`,
+              type: 'product',
+              targetId: id
+            });
+          }
+        });
+      }
+
+    } catch (e) {
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
       handleFirestoreError(e, OperationType.CREATE, 'products/' + id);
     }
   };
@@ -650,6 +787,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
       // Handle Promo Code increment
       if (promoCodeText) {
+<<<<<<< HEAD
         // Find promo code by code
         const pQuery = query(collection(db, 'promoCodes'), where('code', '==', promoCodeText), limit(1));
         const pSnapshot = await getDocs(pQuery);
@@ -660,6 +798,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             currentGlobalUses: increment(1)
           });
         }
+=======
+        // Reserved for future use
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
       }
       return id;
     } catch (e) {
@@ -679,6 +820,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       // إشعار المتابعين بإطلاق بروموكود
       if (data.storeId && data.storeId !== 'ALL_STORES' && customers.length > 0) {
         const storeName = stores.find(s => s.id === data.storeId)?.shopName || 'متجر';
+<<<<<<< HEAD
         const notifs = customers
           .filter(c => c.followedStores?.includes(data.storeId))
           .map(c => ({
@@ -704,11 +846,21 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               role: 'customer',
               title: `محلك 🎁`,
               message: `عرض جديد بمناسبة العيد أو الفعاليات الخاصة! كود الخصم: ${data.code}`,
+=======
+        customers.forEach(async (c) => {
+          if (c.followedStores?.includes(data.storeId)) {
+            await addNotification({
+              userId: c.id,
+              role: 'customer',
+              title: `بروموكود جديد من ${storeName} 🎁`,
+              message: `تم إطلاق كود خصم جديد: ${data.code}. استفد منه الآن!`,
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
               type: 'promo',
               targetId: id,
               sound: true
             });
           }
+<<<<<<< HEAD
         }
 
         // Notify merchants
@@ -730,6 +882,22 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         }
         
         if (notifs.length > 0) addBulkNotifications(notifs);
+=======
+        });
+      } else if (data.storeId === 'ALL_STORES' && customers.length > 0) {
+        // إشعار جميع المستخدمين بالبروموكود العام
+        customers.forEach(async (c) => {
+          await addNotification({
+            userId: c.id,
+            role: 'customer',
+            title: `محلك 🎁`,
+            message: `عرض جديد بمناسبة العيد أو الفعاليات الخاصة! كود الخصم: ${data.code}`,
+            type: 'promo',
+            targetId: id,
+            sound: true
+          });
+        });
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
       }
 
     } catch (e) {
@@ -877,7 +1045,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const addNotification = async (data: any) => {
+<<<<<<< HEAD
     const id = 'notif_' + Date.now() + '_' + Math.floor(Math.random() * 1000000);
+=======
+    const id = 'notif_' + Date.now();
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
     // Default sound to true unless explicitly false
     const soundEnabled = data.sound !== undefined ? data.sound : true;
     const n = { ...data, id, read: false, sound: soundEnabled, createdAt: serverTimestamp() };
@@ -915,7 +1087,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         }
       }
 
+<<<<<<< HEAD
       const pushTitle = data.title || 'محلك';
+=======
+      const pushTitle = isFromAdmin ? 'محلك' : (data.title || 'محلك');
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
 
       await sendExternalPush(data.userId, pushTitle, data.message, channelId);
 
@@ -924,6 +1100,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   };
 
+<<<<<<< HEAD
   const addBulkNotifications = async (notifications: any[]) => {
     try {
       const batches = [];
@@ -1008,6 +1185,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   };
 
+=======
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
   const updateOrder = async (id: string, data: Partial<Order>) => {
     try {
       await updateDoc(doc(db, 'orders', id), data);
@@ -1026,6 +1205,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       if (status === 'rejected') updateData.rejectionReason = reason;
       if (status === 'returned' || status === 'replaced') updateData.returnReason = reason;
       
+<<<<<<< HEAD
       const order = orders.find(o => o.id === id);
 
       if (status === 'delivered' && order && order.customerId) {
@@ -1127,6 +1307,85 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
       // Notification logic for status updates
       if (order && order.customerId) {
+=======
+      await updateDoc(orderRef, updateData);
+
+      // إشعار للزبون بتحديث حالة الطلب
+      const order = orders.find(o => o.id === id);
+      if (order && order.customerId) {
+        // حاسب النقاط والترقيات في حال اكتمال الطلب وتوصيله
+        if (status === 'delivered') {
+          const customer = customers.find(c => c.id === order.customerId);
+          if (customer) {
+            const oldOrdersCount = customer.monthlyOrdersCount || 0;
+            const newOrdersCount = oldOrdersCount + 1;
+            
+            // احتساب نقاط المشتريات: نقطة واحدة لكل 1000 د.ع من إجمالي الطلب
+            const purchaseTotal = order.total || 0;
+            const orderPoints = Math.floor(purchaseTotal / 1000);
+            
+            // تحديد المستوى الجديد وترقية بونص وصعود الرتبة
+            let tierBonus = 0;
+            const oldTier = customer.tier || 'Silver';
+            let newTier: 'Silver' | 'Gold' | 'Platinum' | 'Diamond' = 'Silver';
+            
+            if (newOrdersCount >= 15) {
+              newTier = 'Diamond';
+            } else if (newOrdersCount >= 10) {
+              newTier = 'Platinum';
+            } else if (newOrdersCount >= 5) {
+              newTier = 'Gold';
+            } else {
+              newTier = 'Silver';
+            }
+            
+            if (oldTier === 'Silver' && newTier === 'Gold') {
+              tierBonus = 100; // المستوى الثاني: 100 نقطة
+            } else if (oldTier === 'Gold' && newTier === 'Platinum') {
+              tierBonus = 125; // المستوى الثالث: 125 نقطة
+            } else if (oldTier === 'Platinum' && newTier === 'Diamond') {
+              tierBonus = 150; // المستوى الرابع: 150 نقطة
+            }
+            
+            const totalAddedPoints = orderPoints + tierBonus;
+            
+            // تحديث الحساب في قاعدة البيانات
+            const custRef = doc(db, 'customers', order.customerId);
+            await updateDoc(custRef, {
+              points: increment(totalAddedPoints),
+              monthlyOrdersCount: newOrdersCount,
+              tier: newTier
+            });
+            
+            // تحديث الحالة المحلية تلقائياً إن وافق المستخدم الحالي
+            if (currentCustomer && currentCustomer.id === order.customerId) {
+              setCurrentCustomerState({
+                ...currentCustomer,
+                points: (currentCustomer.points || 0) + totalAddedPoints,
+                monthlyOrdersCount: newOrdersCount,
+                tier: newTier
+              });
+            }
+            
+            // إشعار ممتع للزبون بالمكاسب
+            let loyaltyMsg = `حصلت تلقائياً على +${orderPoints} نقطة كفوز رائع بمشترياتك!`;
+            if (tierBonus > 0) {
+              loyaltyMsg += ` 🆙 مبارك صعودك للمستوى ${newTier === 'Gold' ? 'الذهبي' : newTier === 'Platinum' ? 'البلاتيني' : 'الماسي'}! تم إهداؤك +${tierBonus} نقطة إضافية!`;
+            }
+            
+            await addNotification({
+              userId: order.customerId,
+              role: 'customer',
+              type: 'system',
+              title: '🎁 تم شحن محفظة نقاطك!',
+              message: loyaltyMsg,
+              targetId: id,
+              sound: true
+            });
+          }
+        }
+
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
         let statusText = status;
         let pSound = true;
         if (status === 'accepted') { statusText = 'تم قبول طلبك بنجاح'; pSound = true; }
@@ -1147,6 +1406,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           sound: pSound
         });
       }
+<<<<<<< HEAD
     } catch (e: any) {
       if (e.message && e.message.includes('ALREADY_DELIVERED')) {
         console.log('Order already delivered, skipped duplicate request.');
@@ -1196,6 +1456,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     } catch (e) {
       console.error(e);
       throw e;
+=======
+    } catch (e) {
+      handleFirestoreError(e, OperationType.UPDATE, 'orders/' + id);
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
     }
   };
 
@@ -1332,6 +1596,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const markNotificationAsRead = async (id: string) => {
+<<<<<<< HEAD
     setNotifications((prev) =>
       prev.map((n) => (n.id === id ? { ...n, read: true } : n))
     );
@@ -1341,12 +1606,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       setNotifications((prev) =>
         prev.map((n) => (n.id === id ? { ...n, read: false } : n))
       );
+=======
+    try {
+      await updateDoc(doc(db, 'notifications', id), { read: true });
+    } catch (e) {
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
       handleFirestoreError(e, OperationType.UPDATE, 'notifications/' + id);
     }
   };
 
   const markAllNotificationsAsRead = async (userId: string, role: string) => {
     const unread = notifications.filter(n => n.userId === userId && n.role === role && !n.read);
+<<<<<<< HEAD
     if (unread.length === 0) return;
 
     setNotifications((prev) =>
@@ -1355,6 +1626,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       )
     );
 
+=======
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
     const batch = writeBatch(db);
     unread.forEach(n => {
       batch.update(doc(db, 'notifications', n.id), { read: true });
@@ -1362,16 +1635,20 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     try {
       await batch.commit();
     } catch (e) {
+<<<<<<< HEAD
       setNotifications((prev) =>
         prev.map((n) => {
           const wasUnread = unread.some((u) => u.id === n.id);
           return wasUnread ? { ...n, read: false } : n;
         })
       );
+=======
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
       handleFirestoreError(e, OperationType.WRITE, 'mark_all_read');
     }
   };
 
+<<<<<<< HEAD
   const sendAdminNotification = (t: string, m: string, target: string) => {
     // Determine the array of target customers based on the dropdown selection
     const isAll = target === 'all' || target === 'ALL';
@@ -1388,6 +1665,25 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }));
 
     addBulkNotifications(notificationsToProcess);
+=======
+  const sendAdminNotification = (_t: string, m: string, target: string) => {
+    // Collect all valid targets
+    const allUsers = [
+      ...customers.map(c => ({ id: c.id, role: 'customer' })),
+      ...stores.map(s => ({ id: s.id, role: 'merchant' }))
+    ];
+    
+    const targets = target === 'ALL' ? allUsers : allUsers.filter(u => u.id === target);
+    
+    targets.forEach(t => {
+      addNotification({
+        userId: t.id,
+        role: t.role,
+        title: 'محلك',
+        message: m
+      });
+    });
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
   };
 
   const toggleAutoApprove = () => updateAdminSettings({ autoApproveStores: !adminSettings.autoApproveStores });
@@ -1572,6 +1868,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       await setDoc(doc(db, 'flash_sales', id), { ...data, id, createdAt: serverTimestamp() });
       
       // Notify all active merchants
+<<<<<<< HEAD
       const activeStores = stores.filter(s => s.status === 'active' && !s.isBanned);
       const notifs = activeStores.map(store => ({
         userId: store.id,
@@ -1583,6 +1880,20 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       }));
       
       if (notifs.length > 0) addBulkNotifications(notifs);
+=======
+      stores.filter(s => s.status === 'active' && !s.isBanned).forEach(async store => {
+        try {
+          await addNotification({
+            userId: store.id,
+            role: 'merchant',
+            title: 'محلك',
+            message: `فعالية جديدة معلنة! "${data.title}"، يمكنك الآن طلب المشاركة بمنتجاتك!`,
+            type: 'system',
+            targetId: id
+          });
+        } catch(_e) { /* ignore */ }
+      });
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
     } catch (e) {
       handleFirestoreError(e, OperationType.CREATE, 'flash_sales/' + id);
     }
@@ -1594,6 +1905,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       await updateDoc(doc(db, 'flash_sales', id), { status });
       
       if (status === 'active' && sale) {
+<<<<<<< HEAD
         const activeCustomers = customers.filter(c => !c.isBlocked);
         const notifs = activeCustomers.map(customer => ({
             userId: customer.id,
@@ -1604,6 +1916,20 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             targetId: id
         }));
         if (notifs.length > 0) addBulkNotifications(notifs);
+=======
+        customers.filter(c => !c.isBlocked).forEach(async customer => {
+          try {
+            await addNotification({
+              userId: customer.id,
+              role: 'customer',
+              title: 'محلك',
+              message: `بدأت الآن الفعالية الكبرى "${sale.title}"! تصفح أفضل العروض والخصومات.`,
+              type: 'system',
+              targetId: id
+            });
+          } catch(_e) { /* ignore */ }
+        });
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
       }
     } catch (e) {
       handleFirestoreError(e, OperationType.UPDATE, 'flash_sales/' + id);
@@ -2025,10 +2351,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         'stationary',
         'flowers',
         'sports',
+<<<<<<< HEAD
         'pharmacy',
         'office_equipment',
         'home_appliances',
         'smoking_hookah'
+=======
+        'pharmacy'
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
       ];
 
       const categoryLabels: Record<string, string> = {
@@ -2050,10 +2380,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         stationary: 'قرطاسية وألعاب',
         flowers: 'زهور وهدايا',
         sports: 'تجهيزات رياضية',
+<<<<<<< HEAD
         pharmacy: 'صيدليات وعناية',
         office_equipment: 'أجهزة مكتبية',
         home_appliances: 'أدوات منزلية',
         smoking_hookah: 'سكائر وأراكيل'
+=======
+        pharmacy: 'صيدليات وعناية'
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
       };
 
       const categoryIcons: Record<string, string> = {
@@ -2075,10 +2409,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         stationary: 'open-book',
         flowers: 'flowery-heart',
         sports: 'dumbbell',
+<<<<<<< HEAD
         pharmacy: 'pill',
         office_equipment: 'printer',
         home_appliances: 'coffee-cup',
         smoking_hookah: 'smoking'
+=======
+        pharmacy: 'pill'
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
       };
 
       const provincesList = ['بغداد', 'البصرة', 'الموصل', 'النجف', 'كربلاء', 'بابل', 'أربيل', 'السليمانية'];
@@ -2105,10 +2443,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         stationary: ['قرطاسية ومكتبة دجلة', 'عالم الألعاب والتعليم المرح', 'مطبعة النخلة للأدوات المدرسية'],
         flowers: ['زهور التوليب الحمراء', 'مشاتل الياسمين وهدايا بغداد', 'تنسيقات ورد جوري الساحرة'],
         sports: ['باور فيتنس للأدوات الرياضية', 'العراق لملابس وتجهيزات الرياضة', 'محارب الحديد لبناء الأجسام'],
+<<<<<<< HEAD
         pharmacy: ['صيدلية الشفاء والعناية الطبية', 'صيدلية بغداد المركزية الحديثة', 'مستلزمات وعناية العائلة الطبية'],
         office_equipment: ['مكتبة دجلة للأدوات المكتبية', 'روائع الاثاث والقرطاسية المكتبية', 'الأوفيس السريع للتجهيز'],
         home_appliances: ['البيت السعيد للأدوات المنزلية', 'مجمع أدوات المطبخ الذكي', 'أواني الرافدين الفاخرة'],
         smoking_hookah: ['عالم الأراكيل والسيكار', 'مزاج للفيب والمعسل', 'ارجيلة السلطان المميزة']
+=======
+        pharmacy: ['صيدلية الشفاء والعناية الطبية', 'صيدلية بغداد المركزية الحديثة', 'مستلزمات وعناية العائلة الطبية']
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
       };
 
       const productTemplates: Record<string, { nouns: string[], adjectives: string[], basePrice: number, imageKeywords: string[] }> = {
@@ -2225,6 +2567,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           adjectives: ['آمن ومرخص ومعتمد من وزارة الصحة والرقابة', 'يعطي حماية تدوم لأربع وعشرين ساعة', 'تسكين دقيق وفوري يمنحك راحة وسكينة بالحركة'],
           basePrice: 9000,
           imageKeywords: ['lip-balm', 'blood-pressure', 'hand-sanitizer', 'pain-patch']
+<<<<<<< HEAD
         },
         office_equipment: {
           nouns: ['طابعة ليزرية سريعة', 'كرسي دوار طبي ممتاز', 'ورق طباعة أبيض للشركات', 'مكبس ورق مكتبي ضخم'],
@@ -2243,6 +2586,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           adjectives: ['يحافظ على طعم النكهة ولا يغيرها أبداً', 'صناعة ممتازة لعشاق الأجواء الراقية', 'كثافة هائلة وتجربة لا تُنسى'],
           basePrice: 5000,
           imageKeywords: ['charcoal', 'hookah-flavor', 'hookah-glass', 'vape']
+=======
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
         }
       };
 
@@ -2703,16 +3048,24 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   return (
     <AppContext.Provider value={{
+<<<<<<< HEAD
       provinces: IRAQ_PROVINCES, stores, products, customers, orders, promoCodes, notifications, payoutRequests, currentCustomer, currentMerchant, currentAdmin, adminSettings, subscriptionPlans, flashSales, flashSaleRequests, storeReviews,
       getCustomerSeqId, getOrderSeqId,
       setOrders,
       setCurrentCustomer, setCurrentMerchant, setCurrentAdmin, registerCustomer, updateCustomerProfile, toggleFollowStore, toggleStoreNotification, placeOrder, convertPointsToPromo, addCustomerPoints, submitStoreReview, updateStoreReview, deleteStoreReview, registerMerchant, updateStoreProfile, addProduct, updateProduct, deleteProduct, createPromoCode, updatePromoCode, togglePromoCodeStatus, updateOrder, updateOrderStatus, requestPayout, completePayout, addNotification, addBulkNotifications, markNotificationAsRead, markAllNotificationsAsRead, sendAdminNotification,
+=======
+      provinces: IRAQ_PROVINCES, stores, products, customers, orders, promoCodes, notifications, currentCustomer, currentMerchant, currentAdmin, adminSettings, subscriptionPlans, flashSales, flashSaleRequests, storeReviews,
+      getCustomerSeqId, getOrderSeqId,
+      setOrders,
+      setCurrentCustomer, setCurrentMerchant, setCurrentAdmin, registerCustomer, updateCustomerProfile, toggleFollowStore, toggleStoreNotification, placeOrder, convertPointsToPromo, addCustomerPoints, submitStoreReview, updateStoreReview, deleteStoreReview, registerMerchant, updateStoreProfile, addProduct, updateProduct, deleteProduct, createPromoCode, updatePromoCode, togglePromoCodeStatus, updateOrder, updateOrderStatus, addNotification, markNotificationAsRead, markAllNotificationsAsRead, sendAdminNotification,
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
       rechargeCodes, generateRechargeCodes, redeemRechargeCode, deleteRechargeCode,
       toggleAutoApprove, updateSubscriptionPrice, updateStoreStatus, updateStoreBadges, adminUpdateStore, toggleCustomerBlock, deleteCustomer, toggleStoreBan, deleteStore, deletePromoCode, updateAdminSettings,
       createFlashSale, updateFlashSaleStatus, updateFlashSaleDates, deleteFlashSale, requestJoinFlashSale, updateFlashSaleRequestStatus, seedDatabase,
       generateVirtualData, deleteAllVirtualData
     }}>
       {!authLoading ? children : (
+<<<<<<< HEAD
         <div className="fixed inset-0 w-full h-full z-50 flex flex-col items-center justify-center bg-[#0B1320]">
           {/* Subtle brand ambient blobs */}
           <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -2720,10 +3073,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             <div className="absolute bottom-[-10%] left-[-10%] w-72 h-72 bg-[#B18CFF]/8 rounded-full blur-[100px]" />
           </div>
 
+=======
+        <div className="fixed inset-0 w-full h-full z-50 flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-900">
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.5, ease: "easeOut" }}
+<<<<<<< HEAD
             className="flex flex-col items-center relative z-10"
           >
             <div className="relative w-32 h-32 mb-8 flex items-center justify-center">
@@ -2740,18 +3097,38 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               />
             </div>
 
+=======
+            className="flex flex-col items-center"
+          >
+            <div className="relative w-32 h-32 mb-8 flex items-center justify-center">
+              <motion.div 
+                className="absolute inset-0 rounded-full border-[3px] border-purple-100 dark:border-slate-800 border-t-purple-600 dark:border-t-purple-500"
+                animate={{ rotate: 360 }}
+                transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }}
+              />
+              <img src="/icon.png" alt="محلك" className="w-20 h-20 object-contain rounded-2xl shadow-sm" />
+            </div>
+            
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2, duration: 0.5 }}
               className="text-center"
             >
+<<<<<<< HEAD
               <h2 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-l from-[#7B3DFF] to-[#B18CFF] mb-3 tracking-tight">
                 محلك
               </h2>
               <div className="text-gray-200 font-bold text-sm flex items-center justify-center gap-1">
                 <span>جاري إعداد النظام</span>
                 <span className="flex text-[#B18CFF]">
+=======
+              <h2 className="text-2xl font-black text-slate-800 dark:text-white mb-2 tracking-tight">محلك</h2>
+              <div className="text-slate-500 dark:text-slate-400 font-medium text-sm flex items-center justify-center gap-1">
+                <span>جاري إعداد محلك</span>
+                <span className="flex">
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
                   <motion.span animate={{ opacity: [0, 1, 0] }} transition={{ repeat: Infinity, duration: 1.5, delay: 0 }}>.</motion.span>
                   <motion.span animate={{ opacity: [0, 1, 0] }} transition={{ repeat: Infinity, duration: 1.5, delay: 0.2 }}>.</motion.span>
                   <motion.span animate={{ opacity: [0, 1, 0] }} transition={{ repeat: Infinity, duration: 1.5, delay: 0.4 }}>.</motion.span>

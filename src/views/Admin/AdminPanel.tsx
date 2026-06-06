@@ -1,17 +1,27 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../../context/useApp';
+<<<<<<< HEAD
 import { useNavigate } from 'react-router-dom';
 import { auth } from '../../lib/firebase';
 import { signOut } from 'firebase/auth';
 import { StorageService } from '../../services/storageService';
 import { Store, Customer, Order } from '../../types';
+=======
+import { db } from '../../lib/firebase';
+import { collection, onSnapshot, doc, deleteDoc, updateDoc } from 'firebase/firestore';
+import { Store, Customer, Order, Reel } from '../../types';
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
 import { STORE_CATEGORIES, STORE_BADGES } from '../../constants';
 import { 
   Settings, Users, Store as StoreIcon, DollarSign, Shield, Bell, 
   Check, X, Ban, RefreshCw, Search, Edit, AlertTriangle, LogOut, 
   TrendingUp, Calendar, Package, Ticket, Eye, EyeOff, Trash2,
   Plus, Copy, Globe, Star, ShoppingBag, CreditCard, Archive, Car,
+<<<<<<< HEAD
   BarChart3, Activity, Zap, Award, Crown, Palette, Menu, CheckCircle, MessageCircle, Send, Loader2, MapPin, Clock, Truck, Camera, Megaphone, Printer, Wallet
+=======
+  BarChart3, Activity, Zap, Award, Crown, Palette, Menu, CheckCircle, MessageCircle, Send, Loader2, MapPin, Clock, Truck, Camera, Megaphone, Film, PlayCircle, Trash, Printer
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useReactToPrint } from 'react-to-print';
@@ -21,7 +31,10 @@ import { sendWhatsAppMessage } from '../../services/otpService';
 import { BackupService } from '../../services/backupService';
 import { MapContainer, TileLayer, Marker } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
+<<<<<<< HEAD
 import { showConfirm, showToast } from '../../utils/alerts';
+=======
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
 import L from 'leaflet';
 
 // Fix leaflet marker icon issue
@@ -281,6 +294,7 @@ const DatabasePanel: React.FC = () => {
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-slate-50 p-5 rounded-2xl border border-slate-100">
                     <div className="space-y-2">
+<<<<<<< HEAD
                         <label className="text-xs font-bold text-slate-700 block text-right">عدد المتاجر الافتراضية المراد توليدها (عدد غير محدود):</label>
                         <div className="flex items-center gap-2">
                             <input
@@ -301,6 +315,21 @@ const DatabasePanel: React.FC = () => {
                             />
                         </div>
                         <p className="text-[10px] text-slate-400 text-right">توليد أي عدد (١، ١٠، ٥٠، ١٠٠+) من المتاجر دفعة واحدة</p>
+=======
+                        <label className="text-xs font-bold text-slate-700 block text-right">عدد المتاجر الافتراضية المراد توليدها:</label>
+                        <div className="flex items-center gap-3">
+                            <input
+                                type="range"
+                                min="1"
+                                max="30"
+                                value={numStores}
+                                onChange={(e) => setNumStores(parseInt(e.target.value))}
+                                className="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-[#9952FF]"
+                            />
+                            <span className="text-sm font-black text-slate-800 w-8 text-center">{numStores}</span>
+                        </div>
+                        <p className="text-[10px] text-slate-400 text-right">اختر من ١ إلى ٣٠ متجراً لتوليدها دفعة واحدة</p>
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
                     </div>
 
                     <div className="space-y-2">
@@ -609,6 +638,7 @@ const WhatsappRetargetingPanel: React.FC = () => {
         const expiryString = promoExpiryDays > 0 ? `\n\nصالح لمدة ${promoExpiryDays} أيام للتسوق من أي متجر! 🚀` : `\n\nصالح دائماً للتسوق من أي متجر! 🚀`;
         const message = `مرحباً ${customer.name} من منصة محلك! اشتقنالك 💙\n\nلأنك زبون مميز، نهيدك كود خصم بقيمة ${discountString} لطلبك الجاي.\n\nاستخدم الكود:\n${promoCodeString}${expiryString}`;
         
+<<<<<<< HEAD
         try {
           const success = await sendWhatsAppMessage(customer.phone, message);
           if (success) {
@@ -623,6 +653,16 @@ const WhatsappRetargetingPanel: React.FC = () => {
         
         // Delay of 5.5 seconds between messages due to Account Protection limit on Wasender API
         await new Promise(r => setTimeout(r, 5500));
+=======
+        const success = await sendWhatsAppMessage(customer.phone, message);
+        if (success) {
+          setSentCount(c => c + 1);
+          addLog(`✅ نجاح الإرسال للزبون: ${customer.name}`);
+        } else {
+          addLog(`❌ فشل الإرسال للزبون: ${customer.name} (قد يكون بسبب حد الـ API)`);
+        }
+        await new Promise(r => setTimeout(r, 1000));
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
       }
 
       addLog(`🎉 اكتملت الحملة بنجاح! الإجمالي: ${targetCustomers.length}`);
@@ -827,12 +867,19 @@ const provinceCoordinates: Record<string, [number, number]> = {
 };
 
 export const AdminPanel: React.FC = () => {
+<<<<<<< HEAD
   const navigate = useNavigate();
+=======
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
   const { 
     stores, products, customers, orders, promoCodes, subscriptionPlans,
     adminSettings, updateSubscriptionPrice,
     updateStoreStatus, updateStoreBadges, adminUpdateStore, toggleCustomerBlock, deleteCustomer, toggleStoreBan, deleteStore, createPromoCode, togglePromoCodeStatus, deletePromoCode,
+<<<<<<< HEAD
     currentAdmin, setCurrentAdmin, setCurrentCustomer, setCurrentMerchant, provinces, notifications, storeReviews,
+=======
+    currentAdmin, setCurrentAdmin, provinces, notifications, storeReviews,
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
     updateStoreReview, deleteStoreReview,
     markAllNotificationsAsRead,
     deleteProduct, updateProduct, updateAdminSettings,
@@ -840,7 +887,10 @@ export const AdminPanel: React.FC = () => {
     rechargeCodes, generateRechargeCodes, deleteRechargeCode, seedDatabase,
     generateVirtualData, deleteAllVirtualData,
     getCustomerSeqId,
+<<<<<<< HEAD
     payoutRequests, completePayout
+=======
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
   } = useApp();
 
   // ==========================================
@@ -849,9 +899,26 @@ export const AdminPanel: React.FC = () => {
   
   // التاب النشط
   const [activeTab, setActiveTab] = useState<
+<<<<<<< HEAD
     'overview' | 'stores' | 'customers' | 'orders' | 'products' | 'recharge' | 'promos' | 'subscriptions' | 'broadcast' | 'heatmap' | 'settings' | 'flashsales' | 'whatsapp' | 'database' | 'reviews'
   >('overview');
   
+=======
+    'overview' | 'stores' | 'customers' | 'orders' | 'products' | 'recharge' | 'promos' | 'subscriptions' | 'broadcast' | 'heatmap' | 'settings' | 'flashsales' | 'whatsapp' | 'database' | 'reviews' | 'reels'
+  >('overview');
+  
+  const [adminReels, setAdminReels] = useState<Reel[]>([]);
+  const [reelToDelete, setReelToDelete] = useState<string | null>(null);
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'reels'), (snap) => {
+      setAdminReels(snap.docs.map(doc => ({ ...doc.data() as Reel, id: doc.id })));
+    }, (error) => {
+      console.warn("Could not fetch reels for admin:", error);
+    });
+    return () => unsub();
+  }, []);
+  
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
   // فلاتر البحث والتصفية
   const [storeFilter, setStoreFilter] = useState<'all' | 'active' | 'suspended' | 'verified' | 'subscribed' | 'expired_sub'>('all');
   const [customerFilter, setCustomerFilter] = useState<'all' | 'active' | 'blocked'>('all');
@@ -1317,6 +1384,14 @@ export const AdminPanel: React.FC = () => {
     const activeCustomers = customers.filter(c => !c.isBlocked).length;
     const blockedCustomers = customers.filter(c => c.isBlocked).length;
     
+<<<<<<< HEAD
+=======
+    // الريلز
+    const totalReels = adminReels.length;
+    const totalReelViews = adminReels.reduce((acc, r) => acc + (r.viewsCount || 0), 0);
+    const totalReelLikes = adminReels.reduce((acc, r) => acc + (r.likes || 0), 0);
+    
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
     // التقييمات
     const validReviews = storeReviews.filter(r => stores.some(s => s.id === r.storeId));
     const totalReviews = validReviews.length;
@@ -1385,6 +1460,10 @@ export const AdminPanel: React.FC = () => {
     return {
       totalStores, activeStores,
       totalCustomers, activeCustomers, blockedCustomers,
+<<<<<<< HEAD
+=======
+      totalReels, totalReelViews, totalReelLikes,
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
       totalReviews,
       totalOrders, pendingOrders, acceptedOrders, rejectedOrders,
       totalRevenue, totalDeliveryFees, totalDiscounts,
@@ -1393,7 +1472,11 @@ export const AdminPanel: React.FC = () => {
       totalPoints, storesByProvince, customersByTier, topStores,
       activeFlashSales, totalFlashSaleRequests, activeRechargeCodes, totalRechargePoints
     };
+<<<<<<< HEAD
   }, [stores, customers, orders, products, promoCodes, storeReviews, flashSales, flashSaleRequests, rechargeCodes]);
+=======
+  }, [stores, customers, orders, products, promoCodes, adminReels, storeReviews, flashSales, flashSaleRequests, rechargeCodes]);
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
 
   // فلترة المتاجر
   const filteredStores = useMemo(() => {
@@ -1511,6 +1594,7 @@ export const AdminPanel: React.FC = () => {
   };
 
   // تسجيل خروج الأدمن
+<<<<<<< HEAD
   const handleAdminLogout = async () => {
     try {
       await signOut(auth);
@@ -1524,6 +1608,12 @@ export const AdminPanel: React.FC = () => {
     setAdminPassword('');
     setActiveTab('overview');
     navigate('/', { replace: true });
+=======
+  const handleAdminLogout = () => {
+    setCurrentAdmin(false);
+    setAdminPassword('');
+    setActiveTab('overview');
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
   };
 
   // حفظ سعر الاشتراك
@@ -1551,16 +1641,27 @@ export const AdminPanel: React.FC = () => {
       return;
     }
 
+<<<<<<< HEAD
     let expiryDate: string | undefined | null;
+=======
+    let expiryDate: string | undefined;
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
     let startDate: string | undefined;
 
     if (newPromoExpiryType === 'days') {
       expiryDate = newPromoExpiryDays > 0 
         ? new Date(Date.now() + newPromoExpiryDays * 24 * 60 * 60 * 1000).toISOString()
+<<<<<<< HEAD
         : null;
     } else {
       startDate = newPromoStartDate ? new Date(newPromoStartDate).toISOString() : undefined;
       expiryDate = newPromoEndDate ? new Date(newPromoEndDate).toISOString() : null;
+=======
+        : undefined;
+    } else {
+      startDate = newPromoStartDate ? new Date(newPromoStartDate).toISOString() : undefined;
+      expiryDate = newPromoEndDate ? new Date(newPromoEndDate).toISOString() : undefined;
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
     }
 
     let tStores: string[] | undefined = undefined;
@@ -1570,6 +1671,7 @@ export const AdminPanel: React.FC = () => {
     if (newPromoTargetMode === 'province' && newPromoSelectedProvinces.length > 0) tProvinces = newPromoSelectedProvinces;
 
     createPromoCode({
+<<<<<<< HEAD
       storeId: 'ALL_STORES', // Used as a fallback/identifier in current system
       code: newPromoCode.toUpperCase().replace(/\s+/g, ''),
       discountType: newPromoDiscountType === 'amount' ? 'FIXED' : 'PERCENTAGE',
@@ -1587,6 +1689,18 @@ export const AdminPanel: React.FC = () => {
       expirationDate: expiryDate || null, // legacy
       sponsor: 'ADMIN',
       targetAudience: 'ALL' // Admins default to global codes
+=======
+      storeId: 'ALL_STORES',
+      code: newPromoCode.toUpperCase().replace(/\s+/g, ''),
+      discountType: newPromoDiscountType,
+      discountValue: newPromoDiscount,
+      maxUses: newPromoMaxUses,
+      maxUsesPerUser: newPromoMaxUsesPerUser,
+      targetStores: tStores,
+      targetProvinces: tProvinces,
+      startDate: startDate,
+      expiresAt: expiryDate
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
     });
 
     alert(`تم إنشاء كود الخصم "${newPromoCode.toUpperCase()}" بنجاح! 🎉`);
@@ -1814,6 +1928,7 @@ export const AdminPanel: React.FC = () => {
             <span className="font-semibold">أسعار الاشتراكات</span>
           </button>
 
+<<<<<<< HEAD
           {/* مدفوعات المتاجر */}
           <button 
             onClick={() => handleTabSelect('payouts' as any)}
@@ -1830,6 +1945,8 @@ export const AdminPanel: React.FC = () => {
             )}
           </button>
 
+=======
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
           {/* الفعاليات المركزية */}
           <button 
             onClick={() => handleTabSelect('flashsales')}
@@ -1916,7 +2033,10 @@ export const AdminPanel: React.FC = () => {
           </button>
 
           {/* ريلز */}
+<<<<<<< HEAD
           {/* إدارة الريلز (مخفية مؤقتاً)
+=======
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
           <button 
             onClick={() => handleTabSelect('reels')}
             className={`w-full flex items-center space-x-3 space-x-reverse px-4 py-2.5 rounded-xl transition text-sm ${
@@ -1926,7 +2046,10 @@ export const AdminPanel: React.FC = () => {
             <Film size={18} className="text-blue-400" />
             <span className="font-semibold">إدارة الريلز</span>
           </button>
+<<<<<<< HEAD
           */}
+=======
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
 
           {/* الإعدادات */}
           <button 
@@ -2106,7 +2229,10 @@ export const AdminPanel: React.FC = () => {
 
             {/* الإحصائيات الإضافية (ريلز وتقييمات ومنتجات) */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+<<<<<<< HEAD
               {/*
+=======
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
               <div 
                 onClick={() => handleTabSelect('reels')}
                 className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 cursor-pointer hover:shadow-md transition"
@@ -2125,7 +2251,10 @@ export const AdminPanel: React.FC = () => {
                   <span className="text-pink-500">إعجابات: {(stats.totalReelLikes || 0).toLocaleString()}</span>
                 </div>
               </div>
+<<<<<<< HEAD
               */}
+=======
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
 
               <div 
                 onClick={() => handleTabSelect('reviews')}
@@ -2541,14 +2670,21 @@ export const AdminPanel: React.FC = () => {
                         <div className="min-w-0 text-right">
                           <h3 className="text-md font-black text-slate-800 flex items-center gap-1.5 flex-wrap">
                             <span>{activeStore.shopName}</span>
+<<<<<<< HEAD
                             <CopyButton text={activeStore.shopName} size={14} />
+=======
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
                             {(activeStore.isVerified || (activeStore as any).is_verified) && (
                               <span className="bg-blue-50 text-blue-600 border border-blue-100 text-[9px] font-black px-2 py-0.5 rounded-full flex items-center gap-1">
                                 <VerifiedBadge size={10} /> موثق رسمياً
                               </span>
                             )}
                           </h3>
+<<<<<<< HEAD
                           <span className="text-xs text-slate-400 font-mono inline-flex items-center gap-1">@{activeStore.username} <CopyButton text={activeStore.username} size={10} /></span>
+=======
+                          <span className="text-xs text-slate-400 font-mono">@{activeStore.username}</span>
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
                         </div>
                       </div>
                       <button 
@@ -2618,6 +2754,7 @@ export const AdminPanel: React.FC = () => {
                           <div className="grid grid-cols-2 gap-4">
                             <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
                               <span className="text-[10px] text-slate-400 font-bold block mb-1">المالك</span>
+<<<<<<< HEAD
                               <span className="text-sm font-bold text-slate-800 flex items-center gap-1"><span>{activeStore.ownerName}</span> <CopyButton text={activeStore.ownerName} size={10} /></span>
                             </div>
                             <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
@@ -2631,6 +2768,21 @@ export const AdminPanel: React.FC = () => {
                             <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
                               <span className="text-[10px] text-slate-400 font-bold block mb-1">المنطقة والمنطقة بالتفصيل</span>
                               <span className="text-sm font-bold text-slate-800 flex items-center gap-1"><span>{activeStore.area || 'غير محدد'}</span> <CopyButton text={activeStore.area || ''} size={10} /></span>
+=======
+                              <span className="text-sm font-bold text-slate-800">{activeStore.ownerName}</span>
+                            </div>
+                            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                              <span className="text-[10px] text-slate-400 font-bold block mb-1">رقم الهاتف</span>
+                              <span className="text-sm font-bold text-slate-800 font-mono">{activeStore.phone}</span>
+                            </div>
+                            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                              <span className="text-[10px] text-slate-400 font-bold block mb-1">المحافظة</span>
+                              <span className="text-sm font-bold text-slate-800">{activeStore.province}</span>
+                            </div>
+                            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                              <span className="text-[10px] text-slate-400 font-bold block mb-1">المنطقة والمنطقة بالتفصيل</span>
+                              <span className="text-sm font-bold text-slate-800">{activeStore.area || 'غير محدد'}</span>
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
                             </div>
                             <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 col-span-2">
                               <span className="text-[10px] text-slate-400 font-bold block mb-1">أقرب نقطة دالة</span>
@@ -2638,7 +2790,10 @@ export const AdminPanel: React.FC = () => {
                               {adminSettings?.enableMaps !== false && activeStore.lat && activeStore.lng && (
                                 <div className="w-full h-32 rounded-xl overflow-hidden border border-slate-200 mt-2 pointer-events-none relative z-0">
                                   <MapContainer 
+<<<<<<< HEAD
                                     key={`active-store-${activeStore.id}`}
+=======
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
                                     center={[activeStore.lat, activeStore.lng]} 
                                     zoom={14} 
                                     style={{ height: "100%", width: "100%", zIndex: 0 }}
@@ -2995,6 +3150,7 @@ export const AdminPanel: React.FC = () => {
                           </div>
 
                           {/* حالة الاشتراك الحالي */}
+<<<<<<< HEAD
                           <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-3xs flex flex-col text-right w-full">
                             <div className="flex justify-between items-center w-full">
                               <div>
@@ -3038,6 +3194,26 @@ export const AdminPanel: React.FC = () => {
                               }
                               return null;
                             })()}
+=======
+                          <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-3xs flex justify-between items-center text-right">
+                            <div>
+                              <span className="text-[10px] text-slate-400 font-bold block mb-1">الوضع الحالي المتجر</span>
+                              <div className="text-md font-black text-slate-800">
+                                {isSubscriptionActive ? (
+                                  <span className="text-emerald-600 flex items-center gap-1">🟢 متجر نشط وصلاحيته مفعّلة</span>
+                                ) : (
+                                  <span className="text-red-500 flex items-center gap-1">🔴 متجر يحتاج لتفعيل وتفعيل اشتراك</span>
+                                )}
+                              </div>
+                              <p className="text-xs font-bold text-slate-500 mt-1">تاريخ انتهاء الباقة الحالي: <span className="font-mono bg-slate-50 px-2 py-0.5 rounded text-slate-800">{activeStore.subscriptionExpiry || 'منتهي/غير مسجل'}</span></p>
+                            </div>
+                            
+                            <div className="text-left">
+                              <span className="text-xs font-black bg-[#9952FF]/10 text-[#9952FF] px-3 py-1.5 rounded-2xl block text-center">
+                                {isSubscriptionActive ? 'مجدد للصلاحية' : 'غير مفعل أول مرة'}
+                              </span>
+                            </div>
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
                           </div>
 
                           {/* مدة وقيمة للتفعيل */}
@@ -3082,9 +3258,14 @@ export const AdminPanel: React.FC = () => {
                                   }
 
                                   let finalExpiry = 'Lifetime';
+<<<<<<< HEAD
                                   const resultDate = new Date(baseDate);
 
                                   if (subTypeSelection !== 'lifetime') {
+=======
+                                  if (subTypeSelection !== 'lifetime') {
+                                    const resultDate = new Date(baseDate);
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
                                     if (subTypeSelection === '1_day') resultDate.setDate(resultDate.getDate() + 1);
                                     else if (subTypeSelection === '2_days') resultDate.setDate(resultDate.getDate() + 2);
                                     else if (subTypeSelection === '3_days') resultDate.setDate(resultDate.getDate() + 3);
@@ -3107,6 +3288,7 @@ export const AdminPanel: React.FC = () => {
                                     finalSubId = 'sub_semi';
                                   }
 
+<<<<<<< HEAD
                                   const validUntilDate = finalExpiry !== 'Lifetime' ? resultDate.toISOString() : (new Date('2099-12-31')).toISOString();
 
                                   await adminUpdateStore(activeStore.id, {
@@ -3114,6 +3296,11 @@ export const AdminPanel: React.FC = () => {
                                     subscriptionId: finalSubId,
                                     subscriptionStatus: 'active',
                                     subscriptionValidUntil: validUntilDate
+=======
+                                  await adminUpdateStore(activeStore.id, {
+                                    subscriptionExpiry: finalExpiry,
+                                    subscriptionId: finalSubId
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
                                   });
                                   alert('🎉 تم بنجاح تفعيل / تجديد الاشتراك المعتمد للمتجر! التاريخ الجديد: ' + finalExpiry);
                                 } catch (err: any) {
@@ -3685,7 +3872,10 @@ export const AdminPanel: React.FC = () => {
                         {adminSettings?.enableMaps !== false && selectedCustomer.lat && selectedCustomer.lng && (
                           <div className="w-full h-32 rounded-xl overflow-hidden border border-slate-200 mt-2 pointer-events-none relative z-0">
                             <MapContainer 
+<<<<<<< HEAD
                               key={`customer-${selectedCustomer.id}`}
+=======
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
                               center={[selectedCustomer.lat, selectedCustomer.lng]} 
                               zoom={14} 
                               style={{ height: "100%", width: "100%", zIndex: 0 }}
@@ -3970,7 +4160,10 @@ export const AdminPanel: React.FC = () => {
                         {adminSettings?.enableMaps !== false && (selectedOrder as any).customerLat && (selectedOrder as any).customerLng && (
                           <div className="w-full h-32 rounded-xl overflow-hidden border border-slate-200 mt-2 pointer-events-none relative z-0">
                             <MapContainer 
+<<<<<<< HEAD
                               key={`order-${selectedOrder.id}`}
+=======
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
                               center={[(selectedOrder as any).customerLat, (selectedOrder as any).customerLng]} 
                               zoom={14} 
                               style={{ height: "100%", width: "100%", zIndex: 0 }}
@@ -4651,6 +4844,7 @@ export const AdminPanel: React.FC = () => {
         )}
 
         {/* ==========================================
+<<<<<<< HEAD
             تاب مدفوعات المتاجر (مستحقات)
             ========================================== */}
         {activeTab === 'payouts' && (
@@ -4847,6 +5041,8 @@ export const AdminPanel: React.FC = () => {
         )}
 
         {/* ==========================================
+=======
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
             تاب أسعار الاشتراكات
             ========================================== */}
         {activeTab === 'subscriptions' && (
@@ -5254,6 +5450,7 @@ export const AdminPanel: React.FC = () => {
                                 </div>
                               </div>
                             </div>
+<<<<<<< HEAD
                             <div className="order-actions-container flex flex-wrap md:flex-nowrap gap-3 mt-4 md:mt-0 items-stretch justify-center content-center h-full sm:w-40 w-full shrink-0">
                               {req.status === 'pending' && (
                                 <>
@@ -5268,6 +5465,17 @@ export const AdminPanel: React.FC = () => {
                               )}
                               {req.status === 'approved' && <span className="px-3 py-1.5 bg-emerald-50 text-emerald-600 font-bold text-xs rounded-lg border border-emerald-100 flex items-center justify-center gap-1 w-full"><span className="w-2 h-2 bg-emerald-500 rounded-full"></span> تمت الموافقة</span>}
                               {req.status === 'rejected' && <span className="px-3 py-1.5 bg-rose-50 text-rose-600 font-bold text-xs rounded-lg border border-rose-100 flex items-center justify-center gap-1 w-full"><span className="w-2 h-2 bg-rose-500 rounded-full"></span> مرفوض</span>}
+=======
+                            <div className="flex gap-2 mt-4 md:mt-0 items-center">
+                              {req.status === 'pending' && (
+                                <>
+                                  <button onClick={() => updateFlashSaleRequestStatus(req.id, 'approved')} className="px-5 py-2 bg-emerald-100 text-emerald-700 font-bold text-xs rounded-xl hover:bg-emerald-200">موافقة</button>
+                                  <button onClick={() => updateFlashSaleRequestStatus(req.id, 'rejected')} className="px-5 py-2 bg-rose-100 text-rose-700 font-bold text-xs rounded-xl hover:bg-rose-200">رفض</button>
+                                </>
+                              )}
+                              {req.status === 'approved' && <span className="px-3 py-1.5 bg-emerald-50 text-emerald-600 font-bold text-xs rounded-lg border border-emerald-100 flex items-center gap-1"><span className="w-2 h-2 bg-emerald-500 rounded-full"></span> تمت الموافقة</span>}
+                              {req.status === 'rejected' && <span className="px-3 py-1.5 bg-rose-50 text-rose-600 font-bold text-xs rounded-lg border border-rose-100 flex items-center gap-1"><span className="w-2 h-2 bg-rose-500 rounded-full"></span> مرفوض</span>}
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
                             </div>
                           </div>
                         );
@@ -5308,7 +5516,11 @@ export const AdminPanel: React.FC = () => {
               </div>
               
               <div className="flex-1 rounded-2xl overflow-hidden border border-slate-200 relative z-0">
+<<<<<<< HEAD
                 <MapContainer key="heatmap" center={[33.3152, 44.3661]} zoom={6} scrollWheelZoom={true} style={{ height: '100%', width: '100%', zIndex: 0 }}>
+=======
+                <MapContainer center={[33.3152, 44.3661]} zoom={6} scrollWheelZoom={true} style={{ height: '100%', width: '100%', zIndex: 0 }}>
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
                   <TileLayer
                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -5332,6 +5544,53 @@ export const AdminPanel: React.FC = () => {
         {activeTab === 'database' && <DatabasePanel />}
 
         {/* ==========================================
+<<<<<<< HEAD
+=======
+            تاب الريلز
+            ========================================== */}
+        {activeTab === 'reels' && (
+          <div className="space-y-6 animate-in slide-in-from-bottom flex flex-col items-center">
+            <h2 className="text-xl font-black text-slate-800 self-start mb-4">إدارة الريلز والمحتوى</h2>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 w-full">
+              {adminReels.length === 0 ? (
+                <div className="col-span-full py-10 text-center text-slate-500 font-bold bg-white rounded-2xl border border-slate-100">لا توجد ريلز حالياً.</div>
+              ) : (
+                adminReels.map(reel => {
+                  const store = stores.find(s => s.id === reel.merchantId);
+                  const product = products.find(p => p.id === reel.linkedProductId);
+                  return (
+                    <div key={reel.id} className="bg-white rounded-2xl overflow-hidden border border-slate-200 shadow-sm relative group flex flex-col h-64 sm:h-72">
+                      <video 
+                        src={reel.videoUrl} 
+                        className="w-full h-full object-cover rounded-t-2xl" 
+                        controls={true}
+                      />
+                      <div className="absolute top-2 right-2 p-1 bg-black/60 rounded-lg text-white text-[9px] flex items-center gap-1 backdrop-blur-sm">
+                        <Eye size={10} /> {reel.viewsCount || 0}
+                      </div>
+                      <button 
+                        onClick={() => setReelToDelete(reel.id)}
+                        className="absolute top-2 left-2 p-1.5 bg-rose-500 text-white rounded-lg shadow-sm hover:bg-rose-600 transition z-[100]"
+                      >
+                        <Trash size={12} />
+                      </button>
+                      <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/80 to-transparent p-2">
+                        <div className="flex items-center gap-1.5">
+                          {store && store.logo && <img src={store.logo} className="w-5 h-5 rounded-full border border-white" alt="" />}
+                          <p className="text-white text-[9px] font-bold truncate max-w-[80px]">{store?.shopName || 'متجر محذوف'}</p>
+                        </div>
+                        <p className="text-[9px] text-white/80 truncate mt-1">{product?.name || 'منتج محذوف'}</p>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ==========================================
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
             تاب الإعلانات الممولة
             ========================================== */}
         {activeTab === 'ads' && (
@@ -6331,6 +6590,43 @@ export const AdminPanel: React.FC = () => {
         </div>
       )}
 
+<<<<<<< HEAD
+=======
+      {/* مودال تأكيد حذف الريلز */}
+      {reelToDelete && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[150] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl animate-scale-in border border-slate-100 flex flex-col items-center text-center space-y-4">
+            <div className="w-16 h-16 bg-red-50 text-red-600 rounded-full flex items-center justify-center shadow-inner">
+              <Trash size={32} />
+            </div>
+            <h3 className="font-black text-slate-800 text-lg">تأكيد حذف الريلز</h3>
+            <p className="text-sm font-bold text-slate-600">هل أنت متأكد من رغبتك في حذف هذا الريلز؟ لا يمكن التراجع عن هذا الإجراء.</p>
+            <div className="flex gap-2 w-full pt-2">
+              <button
+                onClick={async () => {
+                  try {
+                    await deleteDoc(doc(db, 'reels', reelToDelete));
+                    setReelToDelete(null);
+                  } catch (error) {
+                    alert('حدث خطأ أثناء الحذف: ' + error);
+                  }
+                }}
+                className="flex-1 bg-red-500 hover:bg-red-600 text-white font-bold py-3 rounded-xl transition shadow-md shadow-red-500/20"
+              >
+                تأكيد الحذف
+              </button>
+              <button
+                onClick={() => setReelToDelete(null)}
+                className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 rounded-xl transition border border-slate-200"
+              >
+                إلغاء
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
       {/* مودال إضافة فعالية جديدة */}
       {showFlashSaleModal && (
         <div className="fixed inset-0 bg-[#4D2980]/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">

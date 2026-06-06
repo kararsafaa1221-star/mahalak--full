@@ -23,12 +23,18 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 ));
 
 // server.ts
+<<<<<<< HEAD
 var import_dotenv = __toESM(require("dotenv"), 1);
+=======
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
 var import_express = __toESM(require("express"), 1);
 var import_path = __toESM(require("path"), 1);
 var import_axios = __toESM(require("axios"), 1);
 var import_cors = __toESM(require("cors"), 1);
+<<<<<<< HEAD
 import_dotenv.default.config();
+=======
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
 async function startServer() {
   const app = (0, import_express.default)();
   const PORT = 3e3;
@@ -38,7 +44,11 @@ async function startServer() {
     res.json({ success: true, status: "Server is reachable", timestamp: (/* @__PURE__ */ new Date()).toISOString() });
   });
   app.post("/api/otp", async (req, res) => {
+<<<<<<< HEAD
     const { phone, text, message } = req.body;
+=======
+    const { phone, text } = req.body;
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
     const WAS_API_KEY = process.env.WASENDER_ACCESS_TOKEN || "61af7f2a07544f59a208444cf80d5ce717be01ad0b571a13a4f9c3ab5209af21";
     const WAS_INSTANCE_ID = process.env.WASENDER_INSTANCE_ID || "83337";
     const API_URL = "https://wasenderapi.com/api/send-message";
@@ -56,7 +66,11 @@ async function startServer() {
       const response = await import_axios.default.post(API_URL, {
         whatsapp_session: WAS_INSTANCE_ID,
         to: formattedNumber,
+<<<<<<< HEAD
         text: text || message
+=======
+        text
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
       }, {
         headers: {
           "Authorization": `Bearer ${WAS_API_KEY}`,
@@ -77,6 +91,7 @@ async function startServer() {
       });
     }
   });
+<<<<<<< HEAD
   app.post("/api/onesignal", async (req, res) => {
     try {
       const { _restApiKey, ...payload } = req.body;
@@ -93,6 +108,8 @@ async function startServer() {
       res.status(status).json({ error: error.response?.data || error.message });
     }
   });
+=======
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
   if (process.env.NODE_ENV !== "production") {
     const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({

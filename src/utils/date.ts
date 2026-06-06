@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 export function getTimestampMillis(dateValue: unknown): number {
   if (!dateValue) return 0;
   const value = dateValue as { toMillis?: () => number; seconds?: number };
@@ -11,6 +12,8 @@ export function getTimestampMillis(dateValue: unknown): number {
   return Number.isNaN(parsed) ? 0 : parsed;
 }
 
+=======
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
 function parseToDate(dateValue: any): Date | null {
   if (!dateValue) return null;
   if (dateValue instanceof Date) return dateValue;

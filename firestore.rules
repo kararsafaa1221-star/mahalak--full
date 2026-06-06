@@ -14,18 +14,26 @@ service cloud.firestore {
     function existing() { return resource.data; }
     
     // ----------------------------------------------------
+<<<<<<< HEAD
     // GLOBAL ADMIN OVERRIDE (GOD MODE) & DEFAULT DENY
     // ----------------------------------------------------
     match /{document=**} {
       // Admins have absolute power over the entire database.
       // Everyone else is denied by default unless specifically allowed in the blocks below.
       allow read, write: if isAdmin();
+=======
+    // DEFAULT DENY
+    // ----------------------------------------------------
+    match /{document=**} {
+      allow read, write: if false;
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
     }
 
     // ----------------------------------------------------
     // ADMINS
     // ----------------------------------------------------
     match /admins/{adminId} {
+<<<<<<< HEAD
       allow read, write: if true;
     }
 
@@ -34,6 +42,9 @@ service cloud.firestore {
     // ----------------------------------------------------
     match /users/{userId} {
       allow read, write: if true;
+=======
+      allow read: if isOwner(adminId);
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
     }
 
     // ----------------------------------------------------
@@ -47,13 +58,25 @@ service cloud.firestore {
     }
 
     match /customers/{customerId} {
+<<<<<<< HEAD
       allow read, write: if true;
+=======
+      allow get: if isValidId(customerId) && (isOwner(customerId) || isAdmin());
+      allow list: if isAdmin();
+      allow create: if isOwner(customerId) && isValidCustomer(incoming());
+      allow update: if (isOwner(customerId) || isAdmin()) && (
+        (incoming().diff(existing()).affectedKeys().hasOnly(['name', 'phone', 'followedStores', 'storeNotifications', 'points']) && isValidCustomer(incoming())) ||
+        (isAdmin() && incoming().diff(existing()).affectedKeys().hasAny(['tier', 'ordersCount', 'monthlyOrdersCount', 'lastResetMonth', 'isBlocked']))
+      );
+      allow delete: if isAdmin();
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
     }
 
     // ----------------------------------------------------
     // STORES
     // ----------------------------------------------------
     function isValidStore(data) {
+<<<<<<< HEAD
       return data.keys().hasAll(['id', 'ownerName', 'shopName', 'phone', 'username']) &&
              data.id is string && data.id.size() <= 64 &&
              data.shopName is string && data.shopName.size() <= 100 &&
@@ -63,6 +86,22 @@ service cloud.firestore {
 
     match /stores/{storeId} {
       allow read, write: if true;
+=======
+      return data.keys().hasAll(['id', 'name', 'ownerId']) &&
+             data.id is string && data.id.size() <= 64 &&
+             data.name is string && data.name.size() <= 100 &&
+             data.ownerId is string;
+    }
+
+    match /stores/{storeId} {
+      allow read: if true;
+      allow create: if isOwner(incoming().ownerId) && isValidStore(incoming());
+      allow update: if (isOwner(existing().ownerId) || isAdmin()) && (
+        (incoming().diff(existing()).affectedKeys().hasOnly(['name', 'description', 'logo', 'cover', 'category', 'location']) && isValidStore(incoming())) ||
+        (isAdmin() && incoming().diff(existing()).affectedKeys().hasAny(['status', 'subscriptionExpiry', 'subscriptionId', 'badges', 'rating', 'isBanned']))
+      );
+      allow delete: if isAdmin();
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
     }
 
     // ----------------------------------------------------
@@ -71,28 +110,65 @@ service cloud.firestore {
     function getStore(sid) { return get(/databases/$(database)/documents/stores/$(sid)).data; }
 
     match /products/{productId} {
+<<<<<<< HEAD
       allow read, write: if true;
+=======
+      allow read: if true;
+      allow create: if isOwner(getStore(incoming().storeId).ownerId);
+      allow update: if (isOwner(getStore(existing().storeId).ownerId) || isAdmin());
+      allow delete: if (isOwner(getStore(existing().storeId).ownerId) || isAdmin());
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
     }
 
     // ----------------------------------------------------
     // ORDERS
     // ----------------------------------------------------
     match /orders/{orderId} {
+<<<<<<< HEAD
       allow read, write: if true;
+=======
+      allow get: if isSignedIn() && (
+        isOwner(resource.data.customerId) || 
+        isOwner(getStore(resource.data.storeId).ownerId) || 
+        isAdmin()
+      );
+      allow list: if isSignedIn(); // Filtering happens on client but rules secure the query via where clauses implicitly by checking data
+      allow create: if isOwner(incoming().customerId);
+      allow update: if isSignedIn() && (
+        (incoming().diff(existing()).affectedKeys().hasOnly(['status']) && (
+          isOwner(getStore(existing().storeId).ownerId) || isAdmin()
+        )) ||
+        (incoming().diff(existing()).affectedKeys().hasOnly(['updatedAt']) && isOwner(existing().customerId))
+      );
+      allow delete: if isAdmin();
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
     }
 
     // ----------------------------------------------------
     // STORE REVIEWS
     // ----------------------------------------------------
     match /store_reviews/{reviewId} {
+<<<<<<< HEAD
       allow read, write: if true;
+=======
+      allow read: if true;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() || isAdmin();
+      allow delete: if isAdmin();
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
     }
 
     // ----------------------------------------------------
     // NOTIFICATIONS
     // ----------------------------------------------------
     match /notifications/{notificationId} {
+<<<<<<< HEAD
       allow read, write: if true;
+=======
+      allow read: if isOwner(resource.data.userId) || isAdmin();
+      allow create: if isSignedIn();
+      allow update: if isOwner(resource.data.userId) && incoming().diff(existing()).affectedKeys().hasOnly(['read']);
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
     }
 
     // ----------------------------------------------------
@@ -104,7 +180,11 @@ service cloud.firestore {
     }
 
     match /flash_sale_requests/{requestId} {
+<<<<<<< HEAD
       allow read: if true;
+=======
+      allow read: if isSignedIn() && (isOwner(getStore(resource.data.storeId).ownerId) || isAdmin());
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
       allow create: if isOwner(getStore(incoming().storeId).ownerId);
       allow update, delete: if isAdmin();
     }
@@ -112,6 +192,7 @@ service cloud.firestore {
     // ----------------------------------------------------
     // PROMO CODES
     // ----------------------------------------------------
+<<<<<<< HEAD
     match /promoCodes/{codeId} {
       allow read, write: if true;
     }
@@ -119,13 +200,29 @@ service cloud.firestore {
     // Also match the old name just in case
     match /promo_codes/{codeId} {
       allow read, write: if true;
+=======
+    match /promo_codes/{codeId} {
+      allow read: if true;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isAdmin();
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
     }
 
     // ----------------------------------------------------
     // RECHARGE CODES
     // ----------------------------------------------------
     match /recharge_codes/{codeId} {
+<<<<<<< HEAD
       allow read, write: if true;
+=======
+      allow read: if isSignedIn();
+      allow create: if isAdmin();
+      allow update: if isSignedIn() && (
+        incoming().diff(existing()).affectedKeys().hasOnly(['status', 'usedBy', 'usedAt']) ||
+        isAdmin()
+      );
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
     }
 
     // ----------------------------------------------------
@@ -144,6 +241,7 @@ service cloud.firestore {
     }
 
     // ----------------------------------------------------
+<<<<<<< HEAD
     // PAYOUT REQUESTS
     // ----------------------------------------------------
     function isValidPayoutRequest(data) {
@@ -159,6 +257,15 @@ service cloud.firestore {
 
     match /payoutRequests/{requestId} {
       allow read, write: if true;
+=======
+    // SHOLLABLE REELS
+    // ----------------------------------------------------
+    match /reels/{reelId} {
+      allow read: if true;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn() || isAdmin();
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
     }
   }
 }

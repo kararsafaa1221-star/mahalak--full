@@ -31,12 +31,18 @@ export const sendWhatsAppMessage = async (phoneNumber: string, message: string):
       formattedNumber = '964' + cleaned;
     }
 
+<<<<<<< HEAD
     const WAS_API_KEY = import.meta.env.VITE_WASENDER_API_KEY || "";
     const WAS_INSTANCE_ID = import.meta.env.VITE_WASENDER_INSTANCE_ID || "";
 
     if (!WAS_API_KEY || !WAS_INSTANCE_ID) {
       throw new Error('إعدادات إرسال الرسائل غير مكتملة. يرجى التواصل مع الدعم.');
     }
+=======
+    const WAS_API_KEY = "61af7f2a07544f59a208444cf80d5ce717be01ad0b571a13a4f9c3ab5209af21";
+    // If you have a different instance ID, update this environment variable or fallback
+    const WAS_INSTANCE_ID = import.meta.env.VITE_WASENDER_INSTANCE_ID || "83337";
+>>>>>>> 18fc01854c1e2793205673b08e1cfbea14a490ab
     const API_URL = 'https://wasenderapi.com/api/send-message';
 
     console.log(`🔗 Connecting to Wasender API for number: ${formattedNumber}`);
